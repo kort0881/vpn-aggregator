@@ -1,0 +1,37 @@
+# VPN Aggregator Configuration
+
+app:
+  name: "VPN Aggregator"
+  version: "1.0.0"
+  brand_name: "@мойканал"
+  debug: false
+
+filters:
+  geo:
+    eu_only: true
+    exclude_countries: ["RU", "BY", "KZ", "CN", "IR"]
+    whitelist_countries: null
+  
+  performance:
+    min_alive_ratio: 0.6
+    min_ping_ms: null
+    max_ping_ms: 500
+  
+  asn_blacklist: []
+
+quality_metrics:
+  profile_update_interval_hours: 24
+  min_nodes_per_source: 5
+
+output:
+  base_path: "./out"
+  format_template: "{country} {ping}ms AS{asn} {protocol}"
+  split_by_country: true
+  split_by_type: true
+  
+  repack:
+    preserve_fields: ["uuid", "password", "port", "host"]
+    modify_fields: ["remark", "tag", "group"]
+
+encoding:
+  output_format: "base64"
