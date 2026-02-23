@@ -1,44 +1,239 @@
 #!/usr/bin/env python3
 """
-VPN Aggregator Pipeline
+pipeline.py
+Главный оркестратор VPN Aggregator Pipeline.
 
-Main orchestrator for the VPN config aggregation, filtering, and repacking pipeline.
+Шаги:
+  1. Ingest      — скачать источники из config.yaml → sources_raw/
+  2. Parse       — разобрать все *.txt в VPNNode[]
+  3. Enrich      — резолв IP, GeoIP (ip-api.com), alive/ping
+  4. Filter      — geo / performance / asn_blacklist + dedup
+  5. Profile     — метрики по источникам → sources_meta/profiles/
+  6. Repack      — rebuild URI + рemark + base64 → out/
+  7. Report      — markdown summary → sources_meta/pipeline_report.md
 """
 
-import sys
-import yaml
-import requests
-from pathlib import Path
-from scripts.parser import ConfigParser
+from __future__ import annotations
 
+import sys
+import time
+from pathlib import Path
+from typing import List
+
+import requests
+import yaml
+
+from scripts.enricher import Enricher
+from scripts.filters import NodeFilter
+from scripts.parser import ConfigParser, VPNNode
+from scripts.profiler import Profiler
+from scripts.repacker import Repacker
+from scripts.reporter import Reporter
+
+
+# ─────────────────────────────────────────────────────────────
+#  Pipeline
+# ─────────────────────────────────────────────────────────────
 
 class VPNAggregatorPipeline:
-    """Main pipeline orchestrator"""
 
     def __init__(self, config_path: str = "config.yaml"):
         self.config_path = config_path
-        self.config = self.load_config()
-        self.parser = ConfigParser()
+        self.config = self._load_config()
 
-        # краткие шорткаты к настройкам
-        self.output_cfg = self.config.get("output", {}) or {}
-        self.filters_cfg = self.config.get("filters", {}) or {}
-        self.base_out = Path(self.output_cfg.get("base_path", "./out"))
+        app = self.config.get("app", {}) or {}
+        self.debug = app.get("debug", False)
+        self.brand = app.get("brand_name", "@vpn")
 
-    def load_config(self) -> dict:
-        """Load configuration from YAML"""
+        quality = self.config.get("quality_metrics", {}) or {}
+        self.min_nodes_per_source = quality.get("min_nodes_per_source", 5)
+
+        out_cfg = self.config.get("output", {}) or {}
+        self.base_out = Path(out_cfg.get("base_path", "./out"))
+
+        self.parser   = ConfigParser()
+        self.enricher = Enricher(debug=self.debug)
+        self.filterer = NodeFilter(self.config)
+        self.profiler = Profiler(min_nodes=self.min_nodes_per_source)
+        self.repacker = Repacker(self.config)
+        self.reporter = Reporter()
+
+        self.nodes: List[VPNNode] = []
+
+    # ── запуск ───────────────────────────────────────────────
+
+    def run(self) -> None:
+        t_start = time.monotonic()
+        self._banner("VPN Aggregator Pipeline")
+
+        self._ensure_dirs()
+        self._step1_ingest()
+        raw_count = self._step2_parse()
+        self._step3_enrich()
+        filter_stats = self._step4_filter()
+        profiles = self._step5_profile()
+        self._step6_repack()
+        self._step7_report(raw_count, filter_stats, profiles)
+
+        elapsed = time.monotonic() - t_start
+        self._banner(f"Done in {elapsed:.1f}s  |  {len(self.nodes)} nodes in out/")
+
+    # ── шаг 1: Ingest ────────────────────────────────────────
+
+    def _step1_ingest(self) -> None:
+        print("\n[1/7] Ingesting sources...")
+        raw_dir = Path("sources_raw")
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        sources_cfg = self.config.get("sources", {}) or {}
+        if not sources_cfg:
+            print("    ! No sources defined in config.yaml")
+            return
+
+        total_ok = total_fail = 0
+
+        for group_name, group_list in sources_cfg.items():
+            if not isinstance(group_list, list):
+                continue
+            print(f"    Group: {group_name}")
+
+            for src in group_list:
+                if not isinstance(src, dict) or not src.get("enabled", True):
+                    continue
+                name = src.get("name") or "noname"
+                url  = src.get("url", "").strip()
+                if not url:
+                    continue
+
+                try:
+                    resp = requests.get(
+                        url,
+                        timeout=25,
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        allow_redirects=True,
+                    )
+                    resp.raise_for_status()
+                    # Проверяем, что получили текст, а не HTML-страницу с ошибкой
+                    ct = resp.headers.get("Content-Type", "")
+                    if "text/html" in ct and "<html" in resp.text[:200].lower():
+                        raise ValueError("Got HTML instead of config")
+
+                    (raw_dir / f"{name}.txt").write_text(resp.text, encoding="utf-8")
+                    total_ok += 1
+                    if self.debug:
+                        print(f"      ✓ {name}")
+                except Exception as exc:
+                    print(f"      ✗ {name}: {exc}")
+                    total_fail += 1
+
+        print(f"    → fetched: {total_ok}  failed: {total_fail}")
+
+    # ── шаг 2: Parse ─────────────────────────────────────────
+
+    def _step2_parse(self) -> int:
+        """Вернуть суммарное количество разобранных строк (до фильтрации)."""
+        print("\n[2/7] Parsing & normalising...")
+        raw_dir = Path("sources_raw")
+        if not raw_dir.exists():
+            print("    ! sources_raw/ missing")
+            return 0
+
+        all_nodes: List[VPNNode] = []
+        total_raw = 0
+
+        for path in sorted(raw_dir.glob("*.txt")):
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except Exception as exc:
+                print(f"    ! Cannot read {path.name}: {exc}")
+                continue
+
+            source_name = path.stem
+            nodes = self.parser.parse_text(text, source=source_name)
+            total_raw += len(text.splitlines())
+            all_nodes.extend(nodes)
+
+            if self.debug:
+                print(f"      {path.name}: {len(nodes)} nodes")
+
+        self.nodes = all_nodes
+        print(f"    → raw lines: {total_raw}  nodes parsed: {len(self.nodes)}")
+        return len(self.nodes)
+
+    # ── шаг 3: Enrich ────────────────────────────────────────
+
+    def _step3_enrich(self) -> None:
+        print("\n[3/7] Enriching nodes (DNS + GeoIP + alive)...")
+        if not self.nodes:
+            print("    ! No nodes to enrich")
+            return
+        self.enricher.enrich_all(self.nodes)
+
+    # ── шаг 4: Filter ────────────────────────────────────────
+
+    def _step4_filter(self) -> dict:
+        print("\n[4/7] Filtering...")
+        geo = self.config.get("filters", {}).get("geo", {}) or {}
+        print(f"    eu_only={geo.get('eu_only')}  "
+              f"exclude={geo.get('exclude_countries')}  "
+              f"whitelist={geo.get('whitelist_countries')}")
+
+        self.nodes, stats = self.filterer.apply(self.nodes)
+        print(f"    → before: {stats['before']}  "
+              f"dup dropped: {stats['dropped_dup']}  "
+              f"filtered: {stats['dropped_filter']}  "
+              f"after: {stats['after']}")
+        return stats
+
+    # ── шаг 5: Profile ───────────────────────────────────────
+
+    def _step5_profile(self) -> dict:
+        print("\n[5/7] Building source profiles...")
+        profiles = self.profiler.build_profiles(self.nodes)
+        print(f"    → profiles saved to sources_meta/profiles/ ({len(profiles)} sources)")
+        return profiles
+
+    # ── шаг 6: Repack ────────────────────────────────────────
+
+    def _step6_repack(self) -> None:
+        print("\n[6/7] Repacking & branding...")
+        self.repacker.repack(self.nodes)
+
+    # ── шаг 7: Report ────────────────────────────────────────
+
+    def _step7_report(self, raw_count: int, filter_stats: dict, profiles: dict) -> None:
+        print("\n[7/7] Generating report...")
+        report = self.reporter.generate(
+            nodes_raw=raw_count,
+            nodes_final=self.nodes,
+            filter_stats=filter_stats,
+            source_profiles=profiles,
+        )
+        print(f"    → report saved to sources_meta/pipeline_report.md")
+
+        # GitHub Actions summary (если переменная есть в окружении)
+        import os
+        ghs = os.environ.get("GITHUB_STEP_SUMMARY")
+        if ghs:
+            try:
+                Path(ghs).open("a", encoding="utf-8").write(report)
+            except Exception:
+                pass
+
+    # ── утилиты ──────────────────────────────────────────────
+
+    def _load_config(self) -> dict:
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         except FileNotFoundError:
-            print(f"Error: Config file '{self.config_path}' not found")
+            print(f"Error: config file '{self.config_path}' not found")
             sys.exit(1)
-        except yaml.YAMLError as e:
-            print(f"Error parsing config: {e}")
+        except yaml.YAMLError as exc:
+            print(f"Error parsing config: {exc}")
             sys.exit(1)
 
-    def ensure_directories(self):
-        """Create necessary directories"""
+    def _ensure_dirs(self) -> None:
         dirs = [
             Path("sources_raw"),
             Path("sources_clean"),
@@ -46,135 +241,29 @@ class VPNAggregatorPipeline:
             self.base_out / "by_type",
             self.base_out / "by_country",
         ]
-        for dir_path in dirs:
-            dir_path.mkdir(parents=True, exist_ok=True)
-        print("[+] Directories structure created")
+        for d in dirs:
+            d.mkdir(parents=True, exist_ok=True)
 
-    def fetch_sources(self):
-        """Step 1: Fetch raw configs from sources (config-driven)"""
-        print("\n[1/4] Fetching sources...")
-        sources_cfg = self.config.get("sources", {}) or {}
-        raw_dir = Path("sources_raw")
-        raw_dir.mkdir(parents=True, exist_ok=True)
-
-        if not sources_cfg:
-            print("    ! No sources defined in config.yaml under 'sources'")
-            return
-
-        total_ok = 0
-        total_failed = 0
-
-        for group_name, group_sources in sources_cfg.items():
-            print(f"    Group: {group_name}")
-            if not isinstance(group_sources, list):
-                print(f"      ! Skipped: group '{group_name}' is not a list")
-                continue
-
-            for src in group_sources:
-                if not isinstance(src, dict):
-                    continue
-
-                if not src.get("enabled", True):
-                    continue
-
-                name = src.get("name") or "noname"
-                url = src.get("url")
-                if not url:
-                    print(f"      - {name}: skipped (no url)")
-                    continue
-
-                print(f"      - {name}: {url}")
-                try:
-                    resp = requests.get(url, timeout=25)
-                    resp.raise_for_status()
-                    (raw_dir / f"{name}.txt").write_text(resp.text, encoding="utf-8")
-                    total_ok += 1
-                except Exception as e:
-                    print(f"        ! failed: {e}")
-                    total_failed += 1
-
-        print(f"    → fetched: {total_ok}, failed: {total_failed}")
-
-    def filter_and_classify(self):
-        """Step 2: Filter by geo and classify (stub for now)"""
-        print("\n[2/4] Filtering and classifying...")
-
-        geo_cfg = self.filters_cfg.get("geo", {}) or {}
-        eu_only = geo_cfg.get("eu_only", False)
-        exclude_countries = geo_cfg.get("exclude_countries", []) or []
-        whitelist_countries = geo_cfg.get("whitelist_countries")
-
-        print(f"    - EU only: {eu_only}")
-        print(f"    - Exclude countries: {', '.join(exclude_countries) if exclude_countries else 'none'}")
-        if whitelist_countries:
-            print(f"    - Whitelist countries: {', '.join(whitelist_countries)}")
-        else:
-            print("    - Whitelist countries: not set")
-
-        # TODO: здесь позже:
-        #  - пройти по sources_clean / нормализованным конфигам
-        #  - применить geo-фильтры (country/region)
-        #  - разнести по временным структурам (по типу/стране)
-
-    def collect_provider_profiles(self):
-        """Step 3: Build provider profiles (stub for now)"""
-        print("\n[3/4] Building provider profiles...")
-        print("    - Analyzing ASN distribution (TODO)")
-        print("    - Calculating alive ratios (TODO)")
-        print("    - Updating whitelist/blacklist (TODO)")
-
-    def repack_configs(self):
-        """Step 4: Repack and rebrand configs (minimal stub)"""
-        print("\n[4/4] Repacking configs...")
-        brand = self.config.get("app", {}).get("brand_name", "@myChannel")
-        template = self.output_cfg.get("format_template", "{country} {ping}ms AS{asn} {protocol}")
-
-        print(f"    - Brand: {brand}")
-        print(f"    - Template: {template}")
-
-        # Заглушка: пока просто создаём пустые файлы-местозаполнители,
-        # чтобы GitHub Actions видел артефакты в out/
-        by_type_dir = self.base_out / "by_type"
-        by_country_dir = self.base_out / "by_country"
-        by_type_dir.mkdir(parents=True, exist_ok=True)
-        by_country_dir.mkdir(parents=True, exist_ok=True)
-
-        # Простейшие плейсхолдеры (можно удалить, когда внедришь реальный репак)
-        (by_type_dir / "vless.txt").write_text("", encoding="utf-8")
-        (by_type_dir / "vmess.txt").write_text("", encoding="utf-8")
-        (by_type_dir / "shadowsocks.txt").write_text("", encoding="utf-8")
-
-        # TODO: позже:
-        #  - читать нормализованные конфиги
-        #  - для каждого считать строку вида template.format(...)
-        #  - учитывать split_by_country / split_by_type
-        #  - использовать self.parser для переупаковки URI с новым remark/tag
-
-        print(f"    - Placeholder files created in: {self.base_out}")
-
-    def run(self):
-        """Run the complete pipeline"""
-        print("=" * 60)
-        print("VPN Aggregator Pipeline")
-        print("=" * 60)
-
-        self.ensure_directories()
-        self.fetch_sources()
-        self.filter_and_classify()
-        self.collect_provider_profiles()
-        self.repack_configs()
-
+    @staticmethod
+    def _banner(text: str) -> None:
         print("\n" + "=" * 60)
-        print("Pipeline completed successfully!")
+        print(f"  {text}")
         print("=" * 60)
 
 
-def main():
-    """Entry point"""
-    pipeline = VPNAggregatorPipeline()
+# ─────────────────────────────────────────────────────────────
+#  Entry point
+# ─────────────────────────────────────────────────────────────
+
+def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description="VPN Aggregator Pipeline")
+    ap.add_argument("--config", default="config.yaml", help="Path to config.yaml")
+    args = ap.parse_args()
+
+    pipeline = VPNAggregatorPipeline(config_path=args.config)
     pipeline.run()
 
 
 if __name__ == "__main__":
     main()
-
