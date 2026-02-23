@@ -1,5 +1,13 @@
+"""
+Enricher:
+- DNS resolve (host -> ip)
+- GeoIP (country, asn) через локальные MaxMind-базы
+- Alive/ping через TCP connect (по умолчанию выключен для стабильности Actions)
+"""
+
 from __future__ import annotations
 
+import os
 import socket
 import time
 from dataclasses import dataclass
@@ -13,21 +21,24 @@ from .parser import VPNNode
 
 @dataclass
 class EnricherConfig:
-    dns_timeout: float = 1.0
+    dns_timeout: float = 2.0
 
     enable_dns: bool = True
     enable_geoip: bool = True
-    enable_alive: bool = False  # ping полностью вырубаем
+    # ВАЖНО: по умолчанию ping выключен, чтобы Actions не висел
+    enable_alive: bool = False
 
+    # каталог и имена локальных GeoIP-баз
     db_dir: str = "data"
     country_db_filename: str = "GeoLite2-Country.mmdb"
     asn_db_filename: str = "GeoLite2-ASN.mmdb"
 
-    country_db_url: str = ""
-    asn_db_url: str = ""
+    # лимит на количество нод для энричмента за один прогон
+    # 0 = без лимита (по всем нодам)
+    max_nodes_per_run: int = 0
 
-    max_nodes_per_run: int = 5000  # обрабатываем только первые 5000
-    ping_timeout: float = 0.5
+    # таймаут TCP-ping
+    ping_timeout: float = 1.0
 
 
 class Enricher:
@@ -35,38 +46,72 @@ class Enricher:
         self.config = config or EnricherConfig()
         self.debug = debug
 
+        # Настройки под CI: агрессивный лимит и отключенный ping
+        if os.environ.get("CI"):
+            # DNS + GeoIP в CI, но только по части нод
+            if self.config.max_nodes_per_run <= 0:
+                # по умолчанию обрабатываем не более 3000 нод
+                self.config.max_nodes_per_run = 3000
+            # короткий таймаут на любые блокирующие сетевые операции
+            if self.config.dns_timeout > 2.0:
+                self.config.dns_timeout = 2.0
+            # ping в CI не включаем
+            self.config.enable_alive = False
+
+        # Устанавливаем таймаут DNS на уровне socket, если задан
+        if self.config.dns_timeout:
+            socket.setdefaulttimeout(self.config.dns_timeout)
+
         self.db_dir = Path(self.config.db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
 
         self.country_db_path = self.db_dir / self.config.country_db_filename
         self.asn_db_path = self.db_dir / self.config.asn_db_filename
 
-        self._geo_country = None
-        self._geo_asn = None
+        self._geo_country: Optional[geoip2.database.Reader] = None
+        self._geo_asn: Optional[geoip2.database.Reader] = None
 
         if self.config.enable_geoip:
+            # Country DB
             if self.country_db_path.exists():
                 try:
                     self._geo_country = geoip2.database.Reader(str(self.country_db_path))
-                except Exception:
-                    self._geo_country = None
+                    if self.debug:
+                        print(f"      [GeoIP] country DB loaded from {self.country_db_path}")
+                except Exception as exc:
+                    if self.debug:
+                        print(f"      [GeoIP] failed to open country DB: {exc}")
+            else:
+                if self.debug:
+                    print(f"      [GeoIP] country DB not found at {self.country_db_path}")
 
+            # ASN DB
             if self.asn_db_path.exists():
                 try:
                     self._geo_asn = geoip2.database.Reader(str(self.asn_db_path))
-                except Exception:
-                    self._geo_asn = None
+                    if self.debug:
+                        print(f"      [GeoIP] ASN DB loaded from {self.asn_db_path}")
+                except Exception as exc:
+                    if self.debug:
+                        print(f"      [GeoIP] failed to open ASN DB: {exc}")
+            else:
+                if self.debug:
+                    print(f"      [GeoIP] ASN DB not found at {self.asn_db_path}")
 
     def enrich_all(self, nodes: List[VPNNode]) -> None:
-        max_n = min(self.config.max_nodes_per_run or len(nodes), len(nodes))
-        for i, node in enumerate(nodes[:max_n]):
+        """Массовое обогащение нод (DNS + GeoIP + ping)."""
+        max_n = self.config.max_nodes_per_run or len(nodes)
+        for i, node in enumerate(nodes):
+            if i >= max_n:
+                break
+            if self.debug and i % 500 == 0:
+                print(f"      [Enrich] {i}/{max_n}", flush=True)
             self._enrich_node(node)
-        if self.debug:
-            print(f"      [Enricher] processed {max_n} nodes out of {len(nodes)}")
 
     def _enrich_node(self, node: VPNNode) -> None:
         extra = node.extra
 
+        # DNS resolve
         if self.config.enable_dns and "ip" not in extra:
             ip = self._resolve_ip(node.host)
             if ip:
@@ -78,13 +123,15 @@ class Enricher:
         if not ip:
             return
 
+        # GeoIP: country + ASN
         if self.config.enable_geoip:
             if self._geo_country:
                 try:
                     c = self._geo_country.country(ip)
                     extra["country"] = c.country.iso_code
                 except Exception:
-                    pass
+                    # если не нашли, помечаем как неизвестную страну
+                    extra.setdefault("country", "XX")
 
             if self._geo_asn:
                 try:
@@ -92,9 +139,17 @@ class Enricher:
                     extra["asn"] = a.autonomous_system_number
                     extra["asn_name"] = a.autonomous_system_organization
                 except Exception:
-                    pass
+                    extra.setdefault("asn", None)
 
-        # ping отключён (enable_alive=False)
+        # Alive / ping через TCP connect (по умолчанию выключено)
+        if self.config.enable_alive:
+            ping_ms = self._tcp_ping(ip or node.host, node.port, timeout=self.config.ping_timeout)
+            if ping_ms is None:
+                extra["alive"] = False
+                extra["ping"] = None
+            else:
+                extra["alive"] = True
+                extra["ping"] = int(ping_ms)
 
     def _resolve_ip(self, host: str) -> Optional[str]:
         try:
@@ -102,7 +157,8 @@ class Enricher:
         except Exception:
             return None
 
-    def _tcp_ping(self, host: str, port: int, timeout: float = 0.5) -> Optional[float]:
+    def _tcp_ping(self, host: str, port: int, timeout: float = 1.0) -> Optional[float]:
+        """Простой TCP 'ping' — время установления TCP-соединения в мс."""
         try:
             start = time.monotonic()
             with socket.create_connection((host, port), timeout=timeout):
