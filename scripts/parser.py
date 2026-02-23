@@ -5,7 +5,7 @@ import re
 import json
 import base64
 from urllib.parse import urlparse, parse_qs, unquote
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from dataclasses import dataclass, field
 
 
@@ -146,6 +146,25 @@ class ConfigParser:
             return ConfigParser.parse_ss(uri)
         else:
             return None
+
+    # >>> ВОТ ЭТОТ МЕТОД НУЖЕН ПАЙПЛАЙНУ <<<
+    def parse_text(self, text: str, source: str = "unknown") -> List[VPNNode]:
+        """
+        Parse whole text block into list of VPNNode.
+        Каждой ноде проставляем extra['source_name'].
+        """
+        nodes: List[VPNNode] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            node = self.parse(line)
+            if not node:
+                continue
+            node.extra.setdefault("source_name", source)
+            nodes.append(node)
+        return nodes
+    # <<< КОНЕЦ ДОБАВКИ >>>
     
     @staticmethod
     def rebuild_uri(node: VPNNode, new_remark: Optional[str] = None) -> str:
