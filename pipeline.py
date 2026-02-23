@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-VPN pipeline под CI (почти боевой):
+VPN pipeline под CI (боевой с GeoIP):
 
   1. load_config  — читаем config.yaml
   2. ingest       — качаем источники → sources_raw/*.txt
   3. parse        — парсим в VPNNode[]
-  4. enrich-lite  — только DNS resolve (без GeoIP и ping), с лимитом в CI
+  4. enrich       — DNS + GeoIP (country+ASN), с лимитом в CI
   5. filter       — применяем NodeFilter из config.yaml
   6. profile      — строим профили по источникам и провайдерам
   7. repack       — генерим сабы в out/ по отфильтрованным нодам
-  8. status       — пишем краткий статус в out/status.txt
+  8. status       — пишем краткий статус и GeoIP-сводку в out/status.txt
 """
 
 from __future__ import annotations
 
 import datetime
 import os
+from collections import Counter
 from pathlib import Path
 from typing import List, Tuple
 
@@ -27,7 +28,6 @@ from scripts.enricher import Enricher, EnricherConfig
 from scripts.filters import NodeFilter
 from scripts.profiler import Profiler
 from scripts.repacker import Repacker
-
 
 SOURCES_RAW_DIR = Path("sources_raw")
 OUT_DIR = Path("out")
@@ -76,7 +76,7 @@ def ingest_sources(cfg: dict) -> None:
             try:
                 resp = requests.get(
                     url,
-                    timeout=10,  # агрессивный таймаут для CI
+                    timeout=10,
                     headers={"User-Agent": "Mozilla/5.0"},
                     allow_redirects=True,
                 )
@@ -121,20 +121,16 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
     return all_nodes
 
 
-def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
-    print("\n[3/8] Enriching nodes (DNS only)...", flush=True)
+def enrich_nodes_dns_geoip(nodes: List[VPNNode]) -> Tuple[int, int]:
+    print("\n[3/8] Enriching nodes (DNS + GeoIP)...", flush=True)
     if not nodes:
         print("    no nodes to enrich", flush=True)
-        return
+        return 0, 0
 
     cfg = EnricherConfig()
     cfg.enable_dns = True
-    cfg.enable_geoip = False
+    cfg.enable_geoip = True
     cfg.enable_alive = False
-
-    if os.environ.get("CI"):
-        cfg.max_nodes_per_run = 1000
-        cfg.dns_timeout = 2.0
 
     print(
         f"    enricher config: dns={cfg.enable_dns} geoip={cfg.enable_geoip} "
@@ -146,10 +142,12 @@ def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
     enricher.enrich_all(nodes)
 
     with_ip = sum(1 for n in nodes if n.extra.get("ip"))
+    with_country = sum(1 for n in nodes if n.extra.get("country"))
     print(
-        f"    → nodes total: {len(nodes)}  with ip: {with_ip}",
+        f"    → nodes total: {len(nodes)}  with ip: {with_ip}  with country: {with_country}",
         flush=True,
     )
+    return with_ip, with_country
 
 
 def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]:
@@ -226,12 +224,40 @@ def repack_outputs(cfg: dict, nodes: List[VPNNode]) -> None:
     print("    → repack finished, out/ updated", flush=True)
 
 
+def collect_geoip_summary(nodes: List[VPNNode], top_n: int = 5) -> Tuple[str, str]:
+    country_counter: Counter[str] = Counter()
+    asn_counter: Counter[str] = Counter()
+
+    for n in nodes:
+        extra = n.extra or {}
+        c = extra.get("country") or "XX"
+        country_counter[c] += 1
+
+        asn = extra.get("asn")
+        asn_name = extra.get("asn_name")
+        if asn:
+            label = f"AS{asn} {asn_name}" if asn_name else f"AS{asn}"
+            asn_counter[label] += 1
+
+    top_countries = ", ".join(
+        f"{c}:{cnt}" for c, cnt in country_counter.most_common(top_n)
+    ) or "n/a"
+    top_asn = ", ".join(
+        f"{label}:{cnt}" for label, cnt in asn_counter.most_common(top_n)
+    ) or "n/a"
+
+    return top_countries, top_asn
+
+
 def write_status(
     nodes_before: int,
     nodes_after: int,
     with_ip: int,
+    with_country: int,
     sources_count: int,
     providers_count: int,
+    top_countries: str,
+    top_asn: str,
 ) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     status_file = OUT_DIR / "status.txt"
@@ -239,10 +265,13 @@ def write_status(
     status_file.write_text(
         f"Last run: {now}Z\n"
         f"Parsed nodes: {nodes_before}\n"
-        f"With IP (after DNS): {with_ip}\n"
+        f"With IP (after enrich): {with_ip}\n"
+        f"With country (after GeoIP): {with_country}\n"
         f"After filters: {nodes_after}\n"
         f"Source profiles: {sources_count}\n"
-        f"Provider profiles: {providers_count}\n",
+        f"Provider profiles: {providers_count}\n"
+        f"Top countries: {top_countries}\n"
+        f"Top ASNs: {top_asn}\n",
         encoding="utf-8",
     )
     print(f"\n[8/8] wrote {status_file}", flush=True)
@@ -250,7 +279,7 @@ def write_status(
 
 def main() -> None:
     print(
-        ">>> pipeline.py started (config + ingest + parse + enrich-dns + filter + profile + repack)",
+        ">>> pipeline.py started (config + ingest + parse + enrich-geoip + filter + profile + repack)",
         flush=True,
     )
 
@@ -261,8 +290,7 @@ def main() -> None:
     nodes = parse_sources(parser)
     nodes_before = len(nodes)
 
-    enrich_nodes_dns_only(nodes)
-    with_ip = sum(1 for n in nodes if n.extra.get("ip"))
+    with_ip, with_country = enrich_nodes_dns_geoip(nodes)
 
     nodes_filtered, stats = apply_filters(cfg, nodes)
     nodes_after = len(nodes_filtered)
@@ -273,14 +301,20 @@ def main() -> None:
 
     repack_outputs(cfg, nodes_filtered)
 
-    write_status(nodes_before, nodes_after, with_ip, sources_count, providers_count)
+    top_countries, top_asn = collect_geoip_summary(nodes_filtered)
+
+    write_status(
+        nodes_before,
+        nodes_after,
+        with_ip,
+        with_country,
+        sources_count,
+        providers_count,
+        top_countries,
+        top_asn,
+    )
 
     print(">>> pipeline.py finished", flush=True)
-
-
-if __name__ == "__main__":
-    main()
-
 
 
 if __name__ == "__main__":
