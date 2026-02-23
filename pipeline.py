@@ -6,10 +6,10 @@ pipeline.py
 Шаги:
   1. Ingest      — скачать источники из config.yaml → sources_raw/
   2. Parse       — разобрать все *.txt в VPNNode[]
-  3. Enrich      — резолв IP, GeoIP (ip-api.com), alive/ping
+  3. Enrich      — резолв IP, GeoIP, alive/ping
   4. Filter      — geo / performance / asn_blacklist + dedup
-  5. Profile     — метрики по источникам → sources_meta/profiles/
-  6. Repack      — rebuild URI + рemark + base64 → out/
+  5. Profile     — метрики по источникам и провайдерам → sources_meta/profiles/, sources_meta/providers/
+  6. Repack      — rebuild URI + remark + base64 → out/
   7. Report      — markdown summary → sources_meta/pipeline_report.md
 """
 
@@ -31,10 +31,6 @@ from scripts.repacker import Repacker
 from scripts.reporter import Reporter
 
 
-# ─────────────────────────────────────────────────────────────
-#  Pipeline
-# ─────────────────────────────────────────────────────────────
-
 class VPNAggregatorPipeline:
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -51,16 +47,17 @@ class VPNAggregatorPipeline:
         out_cfg = self.config.get("output", {}) or {}
         self.base_out = Path(out_cfg.get("base_path", "./out"))
 
-        self.parser   = ConfigParser()
+        self.parser = ConfigParser()
         self.enricher = Enricher(debug=self.debug)
         self.filterer = NodeFilter(self.config)
-        self.profiler = Profiler(min_nodes=self.min_nodes_per_source)
+        self.profiler = Profiler(
+            min_nodes=self.min_nodes_per_source,
+            config=self.config,
+        )
         self.repacker = Repacker(self.config)
         self.reporter = Reporter()
 
         self.nodes: List[VPNNode] = []
-
-    # ── запуск ───────────────────────────────────────────────
 
     def run(self) -> None:
         t_start = time.monotonic()
@@ -101,7 +98,7 @@ class VPNAggregatorPipeline:
                 if not isinstance(src, dict) or not src.get("enabled", True):
                     continue
                 name = src.get("name") or "noname"
-                url  = src.get("url", "").strip()
+                url = src.get("url", "").strip()
                 if not url:
                     continue
 
@@ -113,7 +110,6 @@ class VPNAggregatorPipeline:
                         allow_redirects=True,
                     )
                     resp.raise_for_status()
-                    # Проверяем, что получили текст, а не HTML-страницу с ошибкой
                     ct = resp.headers.get("Content-Type", "")
                     if "text/html" in ct and "<html" in resp.text[:200].lower():
                         raise ValueError("Got HTML instead of config")
@@ -174,23 +170,37 @@ class VPNAggregatorPipeline:
     def _step4_filter(self) -> dict:
         print("\n[4/7] Filtering...")
         geo = self.config.get("filters", {}).get("geo", {}) or {}
-        print(f"    eu_only={geo.get('eu_only')}  "
-              f"exclude={geo.get('exclude_countries')}  "
-              f"whitelist={geo.get('whitelist_countries')}")
+        print(
+            f"    eu_only={geo.get('eu_only')}  "
+            f"exclude={geo.get('exclude_countries')}  "
+            f"whitelist={geo.get('whitelist_countries')}"
+        )
 
         self.nodes, stats = self.filterer.apply(self.nodes)
-        print(f"    → before: {stats['before']}  "
-              f"dup dropped: {stats['dropped_dup']}  "
-              f"filtered: {stats['dropped_filter']}  "
-              f"after: {stats['after']}")
+        print(
+            f"    → before: {stats['before']}  "
+            f"dup dropped: {stats['dropped_dup']}  "
+            f"filtered: {stats['dropped_filter']}  "
+            f"after: {stats['after']}"
+        )
         return stats
 
     # ── шаг 5: Profile ───────────────────────────────────────
 
     def _step5_profile(self) -> dict:
-        print("\n[5/7] Building source profiles...")
+        print("\n[5/7] Building profiles (sources + providers)...")
         profiles = self.profiler.build_profiles(self.nodes)
-        print(f"    → profiles saved to sources_meta/profiles/ ({len(profiles)} sources)")
+
+        by_source = profiles.get("by_source", {})
+        by_provider = profiles.get("by_provider", {})
+
+        print(
+            f"    → source profiles: {len(by_source)} saved to sources_meta/profiles/"
+        )
+        print(
+            f"    → provider profiles: {len(by_provider)} saved to sources_meta/providers/"
+        )
+
         return profiles
 
     # ── шаг 6: Repack ────────────────────────────────────────
@@ -209,9 +219,8 @@ class VPNAggregatorPipeline:
             filter_stats=filter_stats,
             source_profiles=profiles,
         )
-        print(f"    → report saved to sources_meta/pipeline_report.md")
+        print("    → report saved to sources_meta/pipeline_report.md")
 
-        # GitHub Actions summary (если переменная есть в окружении)
         import os
         ghs = os.environ.get("GITHUB_STEP_SUMMARY")
         if ghs:
@@ -238,6 +247,7 @@ class VPNAggregatorPipeline:
             Path("sources_raw"),
             Path("sources_clean"),
             Path("sources_meta/profiles"),
+            Path("sources_meta/providers"),
             self.base_out / "by_type",
             self.base_out / "by_country",
         ]
@@ -251,18 +261,15 @@ class VPNAggregatorPipeline:
         print("=" * 60)
 
 
-# ─────────────────────────────────────────────────────────────
-#  Entry point
-# ─────────────────────────────────────────────────────────────
-
 def main() -> None:
-    import argparse
-    ap = argparse.ArgumentParser(description="VPN Aggregator Pipeline")
-    ap.add_argument("--config", default="config.yaml", help="Path to config.yaml")
-    args = ap.parse_args()
+        import argparse
 
-    pipeline = VPNAggregatorPipeline(config_path=args.config)
-    pipeline.run()
+        ap = argparse.ArgumentParser(description="VPN Aggregator Pipeline")
+        ap.add_argument("--config", default="config.yaml", help="Path to config.yaml")
+        args = ap.parse_args()
+
+        pipeline = VPNAggregatorPipeline(config_path=args.config)
+        pipeline.run()
 
 
 if __name__ == "__main__":
