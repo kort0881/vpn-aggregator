@@ -7,6 +7,7 @@ Enricher:
 
 from __future__ import annotations
 
+import os
 import socket
 import time
 from dataclasses import dataclass
@@ -14,7 +15,6 @@ from pathlib import Path
 from typing import List, Optional
 
 import geoip2.database
-# import requests  # можно добавить, если захочешь автозагрузку .mmdb
 
 from .parser import VPNNode
 
@@ -46,8 +46,24 @@ class EnricherConfig:
 
 class Enricher:
     def __init__(self, config: Optional[EnricherConfig] = None, debug: bool = False):
+        # если пришёл config — используем его, иначе создаём дефолтный
         self.config = config or EnricherConfig()
         self.debug = debug
+
+        # переопределения из env (для GitHub Actions и прочих раннеров)
+        max_nodes_env = os.environ.get("VPN_ENRICH_MAX_NODES")
+        if max_nodes_env is not None:
+            try:
+                self.config.max_nodes_per_run = int(max_nodes_env)
+            except ValueError:
+                pass
+
+        ping_timeout_env = os.environ.get("VPN_ENRICH_PING_TIMEOUT")
+        if ping_timeout_env is not None:
+            try:
+                self.config.ping_timeout = float(ping_timeout_env)
+            except ValueError:
+                pass
 
         self.db_dir = Path(self.config.db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
@@ -149,4 +165,3 @@ class Enricher:
             return (end - start) * 1000.0
         except Exception:
             return None
-
