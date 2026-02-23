@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Упрощённый VPN pipeline под CI:
+VPN pipeline под CI (итерация с фильтрами):
 
   1. load_config  — читаем config.yaml
   2. ingest       — качаем источники → sources_raw/*.txt
   3. parse        — парсим в VPNNode[]
   4. enrich-lite  — только DNS resolve (без GeoIP и ping), с лимитом в CI
-  5. status       — пишем краткий статус в out/status.txt
+  5. filter       — применяем NodeFilter из config.yaml
+  6. status       — пишем краткий статус в out/status.txt
 """
 
 from __future__ import annotations
@@ -14,13 +15,14 @@ from __future__ import annotations
 import datetime
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import requests
 import yaml
 
 from scripts.parser import ConfigParser, VPNNode
 from scripts.enricher import Enricher, EnricherConfig
+from scripts.filters import NodeFilter
 
 
 SOURCES_RAW_DIR = Path("sources_raw")
@@ -44,7 +46,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def ingest_sources(cfg: dict) -> None:
-    print("\n[1/4] Ingesting sources...", flush=True)
+    print("\n[1/5] Ingesting sources...", flush=True)
     SOURCES_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     sources_cfg = cfg.get("sources", {}) or {}
@@ -87,7 +89,7 @@ def ingest_sources(cfg: dict) -> None:
 
 
 def parse_sources(parser: ConfigParser) -> List[VPNNode]:
-    print("\n[2/4] Parsing & normalising...", flush=True)
+    print("\n[2/5] Parsing & normalising...", flush=True)
     if not SOURCES_RAW_DIR.exists():
         print("    sources_raw/ does not exist, nothing to parse", flush=True)
         return []
@@ -116,20 +118,18 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
 
 
 def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
-    print("\n[3/4] Enriching nodes (DNS only)...", flush=True)
+    print("\n[3/5] Enriching nodes (DNS only)...", flush=True)
     if not nodes:
         print("    no nodes to enrich", flush=True)
         return
 
     cfg = EnricherConfig()
-    # DNS включен, GeoIP и ping — нет
     cfg.enable_dns = True
     cfg.enable_geoip = False
     cfg.enable_alive = False
 
-    # В CI режем объём и таймауты
     if os.environ.get("CI"):
-        cfg.max_nodes_per_run = 1000  # обогащаем только верхние 1000 нод
+        cfg.max_nodes_per_run = 1000
         cfg.dns_timeout = 2.0
 
     print(
@@ -148,32 +148,70 @@ def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
     )
 
 
-def write_status(nodes: List[VPNNode]) -> None:
+def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]:
+    print("\n[4/5] Applying filters...", flush=True)
+    if not nodes:
+        print("    no nodes to filter", flush=True)
+        return nodes, {
+            "before": 0,
+            "after": 0,
+            "dropped_dup": 0,
+            "dropped_filter": 0,
+        }
+
+    node_filter = NodeFilter(cfg)
+    filtered, stats = node_filter.apply(nodes)
+
+    geo_cfg = cfg.get("filters", {}).get("geo", {}) or {}
+    print(
+        "    geo filter: "
+        f"eu_only={geo_cfg.get('eu_only')} "
+        f"exclude={geo_cfg.get('exclude_countries')} "
+        f"whitelist={geo_cfg.get('whitelist_countries')}",
+        flush=True,
+    )
+
+    print(
+        f"    stats: before={stats.get('before')} "
+        f"dup_dropped={stats.get('dropped_dup')} "
+        f"filtered={stats.get('dropped_filter')} "
+        f"after={stats.get('after')}",
+        flush=True,
+    )
+    return filtered, stats
+
+
+def write_status(nodes_before: int, nodes_after: int, with_ip: int) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     status_file = OUT_DIR / "status.txt"
     now = datetime.datetime.utcnow().isoformat()
-    with_ip = sum(1 for n in nodes if n.extra.get("ip"))
     status_file.write_text(
         f"Last run: {now}Z\n"
-        f"Parsed nodes: {len(nodes)}\n"
-        f"With IP (after DNS): {with_ip}\n",
+        f"Parsed nodes: {nodes_before}\n"
+        f"With IP (after DNS): {with_ip}\n"
+        f"After filters: {nodes_after}\n",
         encoding="utf-8",
     )
-    print(f"\n[4/4] wrote {status_file}", flush=True)
+    print(f"\n[5/5] wrote {status_file}", flush=True)
 
 
 def main() -> None:
-    print(">>> pipeline.py started (config + ingest + parse + enrich-dns)", flush=True)
+    print(">>> pipeline.py started (config + ingest + parse + enrich-dns + filter)", flush=True)
 
     cfg = load_config()
     ingest_sources(cfg)
 
     parser = ConfigParser()
     nodes = parse_sources(parser)
+    nodes_before = len(nodes)
 
     enrich_nodes_dns_only(nodes)
+    with_ip = sum(1 for n in nodes if n.extra.get("ip"))
 
-    write_status(nodes)
+    nodes_filtered, stats = apply_filters(cfg, nodes)
+    nodes_after = len(nodes_filtered)
+
+    write_status(nodes_before, nodes_after, with_ip)
 
     print(">>> pipeline.py finished", flush=True)
 
