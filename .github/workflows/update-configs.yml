@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0   # важно для pull --rebase
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,12 +43,21 @@ jobs:
         run: |
           python pipeline.py
       
-      - name: Commit and push if changed
+      - name: Commit changes if any
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add out/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "🔄 Auto-update VPN configs [$(date +'%Y-%m-%d %H:%M UTC')]" && git push)
+          git add out/ sources_meta/ sources_raw/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "🔄 Auto-update VPN configs [$(date -u +'%Y-%m-%d %H:%M UTC')]"
+      
+      - name: Pull & push
+        run: |
+          git pull --rebase origin main
+          git push origin main
       
       - name: Generate summary
         if: always()
@@ -67,3 +77,4 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🕐 Updated: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
