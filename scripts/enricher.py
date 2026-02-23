@@ -1,7 +1,7 @@
 """
 Enricher:
 - DNS resolve (host -> ip)
-- GeoIP (country, asn) через локальные/автоскачиваемые MaxMind-базы
+- GeoIP (country, asn) через локальные MaxMind-базы
 - Alive/ping через TCP connect
 """
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import geoip2.database
-import requests
+import requests  # можно удалить, если не планируешь автозагрузку .mmdb
 
 from .parser import VPNNode
 
@@ -27,16 +27,16 @@ class EnricherConfig:
     enable_geoip: bool = True
     enable_alive: bool = True
 
-    # каталоги и URL для автозагрузки баз GeoIP
+    # каталог и имена локальных GeoIP-баз
     db_dir: str = "data"
     country_db_filename: str = "GeoLite2-Country.mmdb"
     asn_db_filename: str = "GeoLite2-ASN.mmdb"
 
-    # сюда впиши свои реальные URL к .mmdb (из своего хранилища / CDN)
-    country_db_url: str = "https://example.com/GeoLite2-Country.mmdb"
-    asn_db_url: str = "https://example.com/GeoLite2-ASN.mmdb"
+    # если потом захочешь автозагрузку — пропишешь реальные URL
+    country_db_url: str = ""
+    asn_db_url: str = ""
 
-    # лимит на количество нод для энричмента за один прогон (чтобы не умирать на десятках тысяч)
+    # лимит на количество нод для энричмента за один прогон
     max_nodes_per_run: int = 5000
 
     # таймаут TCP-ping
@@ -58,33 +58,30 @@ class Enricher:
         self._geo_asn = None
 
         if self.config.enable_geoip:
-            self._ensure_db(self.country_db_path, self.config.country_db_url)
-            self._ensure_db(self.asn_db_path, self.config.asn_db_url)
-
-            # Открываем базы только если они реально существуют
+            # без автозагрузки: просто пытаемся открыть локальные файлы
             if self.country_db_path.exists():
-                self._geo_country = geoip2.database.Reader(str(self.country_db_path))
-            if self.asn_db_path.exists():
-                self._geo_asn = geoip2.database.Reader(str(self.asn_db_path))
+                try:
+                    self._geo_country = geoip2.database.Reader(str(self.country_db_path))
+                    if self.debug:
+                        print(f"      [GeoIP] country DB loaded from {self.country_db_path}")
+                except Exception as exc:
+                    if self.debug:
+                        print(f"      [GeoIP] failed to open country DB: {exc}")
+            else:
+                if self.debug:
+                    print(f"      [GeoIP] country DB not found at {self.country_db_path}")
 
-    def _ensure_db(self, path: Path, url: str) -> None:
-        """Скачать .mmdb, если его ещё нет."""
-        if path.exists():
-            return
-        if not url:
-            return
-        if self.debug:
-            print(f"      [GeoIP] downloading {url} -> {path}")
-        try:
-            resp = requests.get(url, timeout=60, stream=True)
-            resp.raise_for_status()
-            with path.open("wb") as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-        except Exception as exc:
-            if self.debug:
-                print(f"      [GeoIP] failed to download {url}: {exc}")
+            if self.asn_db_path.exists():
+                try:
+                    self._geo_asn = geoip2.database.Reader(str(self.asn_db_path))
+                    if self.debug:
+                        print(f"      [GeoIP] ASN DB loaded from {self.asn_db_path}")
+                except Exception as exc:
+                    if self.debug:
+                        print(f"      [GeoIP] failed to open ASN DB: {exc}")
+            else:
+                if self.debug:
+                    print(f"      [GeoIP] ASN DB not found at {self.asn_db_path}")
 
     def enrich_all(self, nodes: List[VPNNode]) -> None:
         """Массовое обогащение нод (DNS + GeoIP + ping)."""
