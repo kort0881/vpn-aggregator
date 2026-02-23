@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VPN pipeline под CI (итерация с фильтрами и профилями):
+VPN pipeline под CI (почти боевой):
 
   1. load_config  — читаем config.yaml
   2. ingest       — качаем источники → sources_raw/*.txt
@@ -8,7 +8,8 @@ VPN pipeline под CI (итерация с фильтрами и профиля
   4. enrich-lite  — только DNS resolve (без GeoIP и ping), с лимитом в CI
   5. filter       — применяем NodeFilter из config.yaml
   6. profile      — строим профили по источникам и провайдерам
-  7. status       — пишем краткий статус в out/status.txt
+  7. repack       — генерим сабы в out/ по отфильтрованным нодам
+  8. status       — пишем краткий статус в out/status.txt
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from scripts.parser import ConfigParser, VPNNode
 from scripts.enricher import Enricher, EnricherConfig
 from scripts.filters import NodeFilter
 from scripts.profiler import Profiler
+from scripts.repacker import Repacker
 
 
 SOURCES_RAW_DIR = Path("sources_raw")
@@ -48,7 +50,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def ingest_sources(cfg: dict) -> None:
-    print("\n[1/7] Ingesting sources...", flush=True)
+    print("\n[1/8] Ingesting sources...", flush=True)
     SOURCES_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     sources_cfg = cfg.get("sources", {}) or {}
@@ -91,7 +93,7 @@ def ingest_sources(cfg: dict) -> None:
 
 
 def parse_sources(parser: ConfigParser) -> List[VPNNode]:
-    print("\n[2/7] Parsing & normalising...", flush=True)
+    print("\n[2/8] Parsing & normalising...", flush=True)
     if not SOURCES_RAW_DIR.exists():
         print("    sources_raw/ does not exist, nothing to parse", flush=True)
         return []
@@ -120,7 +122,7 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
 
 
 def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
-    print("\n[3/7] Enriching nodes (DNS only)...", flush=True)
+    print("\n[3/8] Enriching nodes (DNS only)...", flush=True)
     if not nodes:
         print("    no nodes to enrich", flush=True)
         return
@@ -151,7 +153,7 @@ def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
 
 
 def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]:
-    print("\n[4/7] Applying filters...", flush=True)
+    print("\n[4/8] Applying filters...", flush=True)
     if not nodes:
         print("    no nodes to filter", flush=True)
         return nodes, {
@@ -184,7 +186,7 @@ def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]
 
 
 def build_profiles(cfg: dict, nodes: List[VPNNode]) -> dict:
-    print("\n[5/7] Building profiles (sources + providers)...", flush=True)
+    print("\n[5/8] Building profiles (sources + providers)...", flush=True)
     if not nodes:
         print("    no nodes to profile", flush=True)
         return {"by_source": {}, "by_provider": {}}
@@ -213,6 +215,17 @@ def build_profiles(cfg: dict, nodes: List[VPNNode]) -> dict:
     return profiles
 
 
+def repack_outputs(cfg: dict, nodes: List[VPNNode]) -> None:
+    print("\n[6/8] Repacking & generating outputs...", flush=True)
+    if not nodes:
+        print("    no nodes to repack", flush=True)
+        return
+
+    repacker = Repacker(cfg)
+    repacker.repack(nodes)
+    print("    → repack finished, out/ updated", flush=True)
+
+
 def write_status(
     nodes_before: int,
     nodes_after: int,
@@ -232,12 +245,12 @@ def write_status(
         f"Provider profiles: {providers_count}\n",
         encoding="utf-8",
     )
-    print(f"\n[7/7] wrote {status_file}", flush=True)
+    print(f"\n[8/8] wrote {status_file}", flush=True)
 
 
 def main() -> None:
     print(
-        ">>> pipeline.py started (config + ingest + parse + enrich-dns + filter + profile)",
+        ">>> pipeline.py started (config + ingest + parse + enrich-dns + filter + profile + repack)",
         flush=True,
     )
 
@@ -257,6 +270,8 @@ def main() -> None:
     profiles = build_profiles(cfg, nodes_filtered)
     sources_count = len(profiles.get("by_source", {}))
     providers_count = len(profiles.get("by_provider", {}))
+
+    repack_outputs(cfg, nodes_filtered)
 
     write_status(nodes_before, nodes_after, with_ip, sources_count, providers_count)
 
