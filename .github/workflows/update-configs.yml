@@ -7,71 +7,56 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'config.yaml'
       - 'pipeline.py'
-      - 'scripts/**'
+      - '.github/workflows/update-configs.yml'
 
 jobs:
   update-configs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-      
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-      
-      - name: Run VPN aggregator pipeline
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run minimal pipeline
         run: |
           python pipeline.py
-      
+
       - name: Commit changes if any
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add out/ sources_meta/ sources_raw/
+          git add out/
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "Auto-update VPN configs"
-      
+          git commit -m "Auto-update status"
+
       - name: Push
         run: |
           git push origin HEAD:main
-      
+
       - name: Generate summary
         if: always()
         run: |
-          echo "## VPN Config Update Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -d "out" ]; then
-            echo "Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "## Minimal VPN pipeline status" >> $GITHUB_STEP_SUMMARY
+          if [ -f "out/status.txt" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Generated Files:" >> $GITHUB_STEP_SUMMARY
-            find out -type f -name "*.txt" -o -name "*.yaml" | while read file; do
-              size=$(wc -l < "$file" 2>/dev/null || echo "0")
-              echo "- \`$file\` ($size lines)" >> $GITHUB_STEP_SUMMARY
-            done
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat out/status.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "No output directory found" >> $GITHUB_STEP_SUMMARY
-          fi
-
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "out/status.txt not found" >> $GITHUB_STEP_SUMMARY
 
