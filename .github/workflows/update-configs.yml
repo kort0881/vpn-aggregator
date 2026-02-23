@@ -40,6 +40,8 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VPN_ENRICH_MAX_NODES: "5000"        # лимит нод для DNS+GeoIP+ping
+          VPN_ENRICH_PING_TIMEOUT: "0.7"      # таймаут TCP ping в секундах
         run: |
           python pipeline.py
       
@@ -72,7 +74,7 @@ jobs:
               size=$(wc -l < "$file" 2>/dev/null || echo "0")
               echo "- \`$file\` ($size lines)" >> $GITHUB_STEP_SUMMARY
             done
-          else
+          else:
             echo "⚠️ No output directory found" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
