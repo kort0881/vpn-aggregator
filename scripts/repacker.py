@@ -1,97 +1,57 @@
-"""
-Repacker:
-- применяет шаблон remark/branding
-- rebuild URI через ConfigParser.rebuild_uri
-- раскладывает по out/by_type и out/by_country
-- дополнительно собирает сабы в out/subs
-"""
-
 from __future__ import annotations
 
+from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List
+from typing import List, Dict
 
-from .parser import VPNNode, ConfigParser
+from .parser import VPNNode
 
 
 class Repacker:
-    def __init__(self, config: Dict):
-        self.config = config or {}
-
-        app_cfg = self.config.get("app", {}) or {}
-        self.brand = app_cfg.get("brand_name", "@vpn")
-
+    def __init__(self, config: dict):
+        self.config = config
         out_cfg = self.config.get("output", {}) or {}
-        self.base_out = Path(out_cfg.get("base_path", "./out"))
-        self.format_template = out_cfg.get(
-            "format_template", "{country} {ping}ms AS{asn} {protocol}"
-        )
-        self.split_by_country = out_cfg.get("split_by_country", True)
-        self.split_by_type = out_cfg.get("split_by_type", True)
+        base_out = Path(out_cfg.get("base_path", "./out"))
+        self.by_type_dir = base_out / "by_type"
+        self.by_country_dir = base_out / "by_country"
+        self.subs_dir = base_out / "subs"
 
-        repack_cfg = out_cfg.get("repack", {}) or {}
-        self.preserve_fields = repack_cfg.get(
-            "preserve_fields", ["uuid", "password", "port", "host"]
-        )
+        self.by_type_dir.mkdir(parents=True, exist_ok=True)
+        self.by_country_dir.mkdir(parents=True, exist_ok=True)
+        self.subs_dir.mkdir(parents=True, exist_ok=True)
 
     def repack(self, nodes: List[VPNNode]) -> None:
-        if not nodes:
-            print("    ! Repacker: no nodes to repack")
-            return
-
-        by_type_dir = self.base_out / "by_type"
-        by_country_dir = self.base_out / "by_country"
-        subs_dir = self.base_out / "subs"
-
-        by_type_dir.mkdir(parents=True, exist_ok=True)
-        by_country_dir.mkdir(parents=True, exist_ok=True)
-        subs_dir.mkdir(parents=True, exist_ok=True)
-
-        # Списки URI (финальный вид, пригодный для сабов)
-        uris_by_type: Dict[str, List[str]] = {}
-        uris_by_country: Dict[str, List[str]] = {}
+        # Группировка по типу и стране
+        by_type: Dict[str, List[str]] = defaultdict(list)
+        by_country: Dict[str, List[str]] = defaultdict(list)
 
         for node in nodes:
-            proto = node.protocol or "unknown"
-            extra = node.extra
-            country = extra.get("country", "XX")
-            ping = extra.get("ping", 0)
-            asn = extra.get("asn", 0)
+            uri = node.to_uri()  # предполагаем, что VPNNode умеет собирать URI
+            t = node.type  # 'vless' / 'vmess' / 'ss'
+            by_type[t].append(uri)
 
-            # remark по шаблону + бренд
-            remark = self.format_template.format(
-                country=country,
-                ping=ping,
-                asn=asn,
-                protocol=proto,
-            )
-            if self.brand and self.brand not in remark:
-                remark = f"{remark} {self.brand}"
-
-            # rebuild URI с новым remark
-            uri = ConfigParser.rebuild_uri(node, new_remark=remark)
-
-            if self.split_by_type:
-                uris_by_type.setdefault(proto, []).append(uri)
-            if self.split_by_country:
-                uris_by_country.setdefault(country, []).append(uri)
+            extra = node.extra or {}
+            country = extra.get("country") or "XX"
+            by_country[country].append(uri)
 
         # Запись по типам
-        if self.split_by_type:
-            for proto, uris in uris_by_type.items():
-                path = by_type_dir / f"{proto}.txt"
-                path.write_text("\n".join(uris) + "\n", encoding="utf-8")
-                print(f"    - by_type: {proto} -> {path} ({len(uris)} lines)")
+        for t, lines in by_type.items():
+            path = self.by_type_dir / f"{t}.txt"
+            text = "\n".join(lines) + "\n"
+            path.write_text(text, encoding="utf-8")
+            print(f"    - by_type: {t} -> {path} ({len(lines)} lines)")
 
         # Запись по странам
-        if self.split_by_country:
-            for country, uris in uris_by_country.items():
-                path = by_country_dir / f"{country}.txt"
-                path.write_text("\n".join(uris) + "\n", encoding="utf-8")
-                print(f"    - by_country: {country} -> {path} ({len(uris)} lines)")
+        for country, lines in by_country.items():
+            path = self.by_country_dir / f"{country}.txt"
+            text = "\n".join(lines) + "\n"
+            path.write_text(text, encoding="utf-8")
+            print(f"    - by_country: {country} -> {path} ({len(lines)} lines)")
 
-        # Дополнительные сабы по типам (например, общий саб для VLESS)
-        for proto, uris in uris_by_type.items():
-            sub_path = subs_dir / f"{proto}_sub.txt"
-            sub_path.write_text("\n".join(uris) + "\n", encoding="utf-8")
-            print(f"    - sub: {proto} -> {sub_path} ({len(uris)} lines)")
+        # Саб-генерация
+        for t, lines in by_type.items():
+            sub_path = self.subs_dir / f"{t}_sub.txt"
+            text = "\n".join(lines) + "\n"
+            sub_path.write_text(text, encoding="utf-8")
+            print(f"    - sub: {t} -> {sub_path} ({len(lines)} lines)")
+
