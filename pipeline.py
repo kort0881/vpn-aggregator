@@ -23,7 +23,7 @@ from typing import List
 import requests
 import yaml
 
-from scripts.enricher import Enricher
+from scripts.enricher import Enricher, EnricherConfig
 from scripts.filters import NodeFilter
 from scripts.parser import ConfigParser, VPNNode
 from scripts.profiler import Profiler
@@ -48,7 +48,10 @@ class VPNAggregatorPipeline:
         self.base_out = Path(out_cfg.get("base_path", "./out"))
 
         self.parser = ConfigParser()
-        self.enricher = Enricher(debug=self.debug)
+        self.enricher = Enricher(
+            config=EnricherConfig(enable_alive=False),
+            debug=self.debug,
+        )
         self.filterer = NodeFilter(self.config)
         self.profiler = Profiler(
             min_nodes=self.min_nodes_per_source,
@@ -159,7 +162,7 @@ class VPNAggregatorPipeline:
     # ── шаг 3: Enrich ────────────────────────────────────────
 
     def _step3_enrich(self) -> None:
-        print("\n[3/7] Enriching nodes (DNS + GeoIP + alive)...")
+        print("\n[3/7] Enriching nodes (DNS + GeoIP)...")
         if not self.nodes:
             print("    ! No nodes to enrich")
             return
@@ -262,14 +265,14 @@ class VPNAggregatorPipeline:
 
 
 def main() -> None:
-        import argparse
+    import argparse
 
-        ap = argparse.ArgumentParser(description="VPN Aggregator Pipeline")
-        ap.add_argument("--config", default="config.yaml", help="Path to config.yaml")
-        args = ap.parse_args()
+    ap = argparse.ArgumentParser(description="VPN Aggregator Pipeline")
+    ap.add_argument("--config", default="config.yaml", help="Path to config.yaml")
+    args = ap.parse_args()
 
-        pipeline = VPNAggregatorPipeline(config_path=args.config)
-        pipeline.run()
+    pipeline = VPNAggregatorPipeline(config_path=args.config)
+    pipeline.run()
 
 
 if __name__ == "__main__":
