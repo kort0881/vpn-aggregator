@@ -8,30 +8,31 @@ app:
 
 filters:
   geo:
-    eu_only: true
+    eu_only: true                     # включать только EU (будет использоваться геомодулем)
     exclude_countries: ["RU", "BY", "KZ", "CN", "IR"]
-    whitelist_countries: null
-  
+    whitelist_countries: null         # при желании сюда можно кинуть ["DE","NL",...]
+
   performance:
     min_alive_ratio: 0.6
     min_ping_ms: null
     max_ping_ms: 500
-  
-  asn_blacklist: []
+
+  asn_blacklist: []                   # позже сюда можно добавлять мусорные AS
 
 quality_metrics:
   profile_update_interval_hours: 24
   min_nodes_per_source: 5
 
 output:
-  base_path: "./out"
+  base_path: "./out"                  # пайплайн читает это вместо хардкода
   format_template: "{country} {ping}ms AS{asn} {protocol}"
   split_by_country: true
   split_by_type: true
-  
+
   repack:
     preserve_fields: ["uuid", "password", "port", "host"]
     modify_fields: ["remark", "tag", "group"]
 
 encoding:
-  output_format: "base64"
+  output_format: "base64"             # можно использовать при экспорте/публикации
+
