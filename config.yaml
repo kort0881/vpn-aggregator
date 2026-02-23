@@ -1,5 +1,4 @@
 # VPN Aggregator Configuration
-
 app:
   name: "VPN Aggregator"
   version: "1.0.0"
@@ -8,31 +7,229 @@ app:
 
 filters:
   geo:
-    eu_only: true                     # включать только EU (будет использоваться геомодулем)
+    eu_only: true
     exclude_countries: ["RU", "BY", "KZ", "CN", "IR"]
-    whitelist_countries: null         # при желании сюда можно кинуть ["DE","NL",...]
-
+    whitelist_countries: null
   performance:
     min_alive_ratio: 0.6
     min_ping_ms: null
     max_ping_ms: 500
-
-  asn_blacklist: []                   # позже сюда можно добавлять мусорные AS
+  asn_blacklist: []
 
 quality_metrics:
   profile_update_interval_hours: 24
   min_nodes_per_source: 5
 
 output:
-  base_path: "./out"                  # пайплайн читает это вместо хардкода
+  base_path: "./out"
   format_template: "{country} {ping}ms AS{asn} {protocol}"
   split_by_country: true
   split_by_type: true
-
   repack:
     preserve_fields: ["uuid", "password", "port", "host"]
     modify_fields: ["remark", "tag", "group"]
 
 encoding:
-  output_format: "base64"             # можно использовать при экспорте/публикации
+  output_format: "base64"
+
+sources:
+  ru_whitelists:
+    - name: igareck_black_ss_all_rus
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/BLACK_SS%2BAll_RUS.txt
+      enabled: true
+
+    - name: igareck_vless_reality_rus_mobile_2
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile-2.txt
+      enabled: true
+
+    - name: igareck_vless_reality_rus_mobile
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/Vless-Reality-White-Lists-Rus-Mobile.txt
+      enabled: true
+
+    - name: igareck_white_cidr_ru_all
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/WHITE-CIDR-RU-all.txt
+      enabled: true
+
+    - name: igareck_white_cidr_ru_checked
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/WHITE-CIDR-RU-checked.txt
+      enabled: true
+
+    - name: igareck_white_sni_ru_all
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/main/WHITE-SNI-RU-all.txt
+      enabled: true
+
+    - name: zieng_vless
+      url: https://raw.githubusercontent.com/zieng2/wl/main/vless.txt
+      enabled: true
+
+    - name: lowik_bypass_whitelist_ru
+      url: https://raw.githubusercontent.com/LowiKLive/BypassWhitelistRu/refs/heads/main/WhiteList-Bypass_Ru.txt
+      enabled: true
+
+    - name: zieng_vless_universal
+      url: https://raw.githubusercontent.com/zieng2/wl/main/vless_universal.txt
+      enabled: true
+
+    - name: vsevjik_wwh
+      url: https://raw.githubusercontent.com/vsevjik/OBSpiskov/refs/heads/main/wwh
+      enabled: true
+
+    - name: vkcloud_love
+      url: https://jsnegsukavsos.hb.ru-msk.vkcloud-storage.ru/love
+      enabled: true
+
+    - name: etoneya_1
+      url: https://etoneya.a9fm.site/1
+      enabled: true
+
+    - name: s3c3_cjdr
+      url: https://s3c3.001.gpucloud.ru/vahe4xkwi/cjdr
+      enabled: true
+
+    - name: igareck_vless_reality_rus_mobile_again
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Mobile.txt
+      enabled: true
+
+    - name: igareck_vless_reality_rus_cable
+      url: https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/Vless-Reality-White-Lists-Rus-Cable.txt
+      enabled: true
+
+  global_mixed:
+    - name: sakha_all_valid_proxies
+      url: https://github.com/sakha1370/OpenRay/raw/refs/heads/main/output/all_valid_proxies.txt
+      enabled: true
+
+    - name: sevcator_vless
+      url: https://raw.githubusercontent.com/sevcator/5ubscrpt10n/main/protocols/vl.txt
+      enabled: true
+
+    - name: proxy_minging_v2ray
+      url: https://raw.githubusercontent.com/yitong2333/proxy-minging/refs/heads/main/v2ray.txt
+      enabled: true
+
+    - name: acymz_autovpn_v2
+      url: https://raw.githubusercontent.com/acymz/AutoVPN/refs/heads/main/data/V2.txt
+      enabled: true
+
+    - name: milad_v2ray_cfg_dumper
+      url: https://raw.githubusercontent.com/miladtahanian/V2RayCFGDumper/refs/heads/main/config.txt
+      enabled: true
+
+    - name: roosterkid_openproxy_v2ray_raw
+      url: https://raw.githubusercontent.com/roosterkid/openproxylist/main/V2RAY_RAW.txt
+      enabled: true
+
+    - name: milad_multi_proxy_fetcher
+      url: https://raw.githubusercontent.com/miladtahanian/multi-proxy-config-fetcher/refs/heads/main/configs/proxy_configs.txt
+      enabled: true
+
+    - name: pawdroid_free_servers
+      url: https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/sub
+      enabled: true
+
+    - name: mehran_v2ray_sub
+      url: https://raw.githubusercontent.com/mehran1404/Sub_Link/refs/heads/main/V2RAY-Sub.txt
+      enabled: true
+
+    - name: shabane_kamaji_merged
+      url: https://raw.githubusercontent.com/shabane/kamaji/master/hub/merged.txt
+      enabled: true
+
+    - name: wuqb_xray_mixed_base64
+      url: https://raw.githubusercontent.com/wuqb2i4f/xray-config-toolkit/main/output/base64/mix-uri
+      enabled: true
+
+    - name: azadnet_clash
+      url: https://raw.githubusercontent.com/AzadNetCH/Clash/refs/heads/main/AzadNet.txt
+      enabled: true
+
+    - name: str97_strugov
+      url: https://raw.githubusercontent.com/STR97/STRUGOV/refs/heads/main/STR.BYPASS
+      enabled: true
+
+    - name: lagzian_ss_collector_mix_clash
+      url: https://raw.githubusercontent.com/lagzian/SS-Collector/main/mix_clash.yaml
+      enabled: true
+
+    - name: v2rayroot_vless
+      url: https://raw.githubusercontent.com/V2RayRoot/V2RayConfig/refs/heads/main/Config/vless.txt
+      enabled: true
+
+    - name: argh_v2rayauto_vless
+      url: https://raw.githubusercontent.com/Argh94/V2RayAutoConfig/refs/heads/main/configs/Vless.txt
+      enabled: true
+
+    - name: argh_v2rayauto_hysteria2
+      url: https://raw.githubusercontent.com/Argh94/V2RayAutoConfig/refs/heads/main/configs/Hysteria2.txt
+      enabled: true
+
+    - name: mahdibland_v2ray_aggregator_sub_list
+      url: https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json
+      enabled: true  # JSON — требует отдельного обработчика
+
+    - name: nirs_vless_sstime
+      url: https://raw.githubusercontent.com/NiREvil/vless/main/sub/SSTime
+      enabled: true
+
+    - name: ndsphonemy_speed
+      url: https://raw.githubusercontent.com/ndsphonemy/proxy-sub/main/speed.txt
+      enabled: true
+
+    - name: mahdi0024_proxycollector
+      url: https://raw.githubusercontent.com/Mahdi0024/ProxyCollector/master/sub/proxies.txt
+      enabled: true
+
+    - name: mosifree_reality
+      url: https://raw.githubusercontent.com/Mosifree/-FREE2CONFIG/refs/heads/main/Reality
+      enabled: true
+
+    - name: mrmohebi_xray_all
+      url: https://raw.githubusercontent.com/MrMohebi/xray-proxy-grabber-telegram/master/collected-proxies/row-url/all.txt
+      enabled: true
+
+  iran_specific:
+    - name: youfoundamin_mixed_iran
+      url: https://raw.githubusercontent.com/youfoundamin/V2rayCollector/main/mixed_iran.txt
+      enabled: true
+
+  collectors_subs:
+    - name: epodonios_trojan
+      url: https://github.com/Epodonios/v2ray-configs/raw/main/Splitted-By-Protocol/trojan.txt
+      enabled: true
+
+    - name: epodonios_vmess
+      url: https://github.com/Epodonios/v2ray-configs/raw/main/Splitted-By-Protocol/vmess.txt
+      enabled: true
+
+    - name: yasserdivar_shadowsocks
+      url: https://raw.githubusercontent.com/YasserDivaR/pr0xy/refs/heads/main/ShadowSocks2021.txt
+      enabled: true
+
+    - name: mohamadfg_telegram_vless
+      url: https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt
+      enabled: true
+
+    - name: mheidari_vless
+      url: https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/vless
+      enabled: true
+
+    - name: mheidari_all
+      url: https://raw.githubusercontent.com/mheidari98/.proxy/refs/heads/main/all
+      enabled: true
+
+    - name: kwinshadow_mix
+      url: https://github.com/Kwinshadow/TelegramV2rayCollector/raw/refs/heads/main/sublinks/mix.txt
+      enabled: true
+
+    - name: lalatina_mineral_nodes
+      url: https://github.com/LalatinaHub/Mineral/raw/refs/heads/master/result/nodes
+      enabled: true
+
+    - name: mahdid_taheri_v2raycollector_mix
+      url: https://github.com/MhdiTaheri/V2rayCollector_Py/raw/refs/heads/main/sub/Mix/mix.txt
+      enabled: true
+
+    - name: mahdid_taheri_v2raycollector_mix2
+      url: https://github.com/MhdiTaheri/V2rayCollector/raw/refs/heads/main/sub/mix
+      enabled: true
 
