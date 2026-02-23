@@ -47,16 +47,17 @@ jobs:
         run: |
           git push origin HEAD:main
 
-      - name: Generate summary
+            - name: Generate summary
         if: always()
         run: |
-          echo "## Minimal VPN pipeline status" >> $GITHUB_STEP_SUMMARY
+          echo "## Minimal VPN pipeline status" >> "$GITHUB_STEP_SUMMARY"
           if [ -f "out/status.txt" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            cat out/status.txt >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat out/status.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "out/status.txt not found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "out/status.txt not found" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
