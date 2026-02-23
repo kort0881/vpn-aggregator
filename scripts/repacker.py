@@ -3,6 +3,7 @@ Repacker:
 - применяет шаблон remark/branding
 - rebuild URI через ConfigParser.rebuild_uri
 - раскладывает по out/by_type и out/by_country
+- дополнительно собирает сабы в out/subs
 """
 
 from __future__ import annotations
@@ -16,8 +17,11 @@ from .parser import VPNNode, ConfigParser
 class Repacker:
     def __init__(self, config: Dict):
         self.config = config or {}
-        out_cfg = self.config.get("output", {}) or {}
 
+        app_cfg = self.config.get("app", {}) or {}
+        self.brand = app_cfg.get("brand_name", "@vpn")
+
+        out_cfg = self.config.get("output", {}) or {}
         self.base_out = Path(out_cfg.get("base_path", "./out"))
         self.format_template = out_cfg.get(
             "format_template", "{country} {ping}ms AS{asn} {protocol}"
@@ -37,8 +41,11 @@ class Repacker:
 
         by_type_dir = self.base_out / "by_type"
         by_country_dir = self.base_out / "by_country"
+        subs_dir = self.base_out / "subs"
+
         by_type_dir.mkdir(parents=True, exist_ok=True)
         by_country_dir.mkdir(parents=True, exist_ok=True)
+        subs_dir.mkdir(parents=True, exist_ok=True)
 
         # Списки URI (финальный вид, пригодный для сабов)
         uris_by_type: Dict[str, List[str]] = {}
@@ -51,13 +58,15 @@ class Repacker:
             ping = extra.get("ping", 0)
             asn = extra.get("asn", 0)
 
-            # remark по шаблону
+            # remark по шаблону + бренд
             remark = self.format_template.format(
                 country=country,
                 ping=ping,
                 asn=asn,
                 protocol=proto,
             )
+            if self.brand and self.brand not in remark:
+                remark = f"{remark} {self.brand}"
 
             # rebuild URI с новым remark
             uri = ConfigParser.rebuild_uri(node, new_remark=remark)
@@ -80,3 +89,9 @@ class Repacker:
                 path = by_country_dir / f"{country}.txt"
                 path.write_text("\n".join(uris) + "\n", encoding="utf-8")
                 print(f"    - by_country: {country} -> {path} ({len(uris)} lines)")
+
+        # Дополнительные сабы по типам (например, общий саб для VLESS)
+        for proto, uris in uris_by_type.items():
+            sub_path = subs_dir / f"{proto}_sub.txt"
+            sub_path.write_text("\n".join(uris) + "\n", encoding="utf-8")
+            print(f"    - sub: {proto} -> {sub_path} ({len(uris)} lines)")
