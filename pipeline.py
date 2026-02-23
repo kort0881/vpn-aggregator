@@ -15,6 +15,7 @@ pipeline.py
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -23,7 +24,7 @@ from typing import List
 import requests
 import yaml
 
-from scripts.enricher import Enricher
+from scripts.enricher import Enricher, EnricherConfig
 from scripts.filters import NodeFilter
 from scripts.parser import ConfigParser, VPNNode
 from scripts.profiler import Profiler
@@ -48,7 +49,25 @@ class VPNAggregatorPipeline:
         self.base_out = Path(out_cfg.get("base_path", "./out"))
 
         self.parser = ConfigParser()
-        self.enricher = Enricher(debug=self.debug)
+
+        # Конфиг Enricher: по умолчанию полный, но с возможностью переопределения через env
+        enrich_cfg = EnricherConfig()
+        # max nodes / timeout можно задать в рантайме (например, в GitHub Actions)
+        max_nodes_env = os.environ.get("VPN_ENRICH_MAX_NODES")
+        if max_nodes_env is not None:
+            try:
+                enrich_cfg.max_nodes_per_run = int(max_nodes_env)
+            except ValueError:
+                pass
+
+        ping_timeout_env = os.environ.get("VPN_ENRICH_PING_TIMEOUT")
+        if ping_timeout_env is not None:
+            try:
+                enrich_cfg.ping_timeout = float(ping_timeout_env)
+            except ValueError:
+                pass
+
+        self.enricher = Enricher(config=enrich_cfg, debug=self.debug)
         self.filterer = NodeFilter(self.config)
         self.profiler = Profiler(
             min_nodes=self.min_nodes_per_source,
@@ -221,7 +240,6 @@ class VPNAggregatorPipeline:
         )
         print("    → report saved to sources_meta/pipeline_report.md")
 
-        import os
         ghs = os.environ.get("GITHUB_STEP_SUMMARY")
         if ghs:
             try:
