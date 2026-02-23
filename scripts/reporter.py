@@ -26,15 +26,16 @@ class Reporter:
         source_profiles: Dict[str, Dict],
     ) -> str:
         ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-        lines = []
+        lines: List[str] = []
 
-        lines.append(f"# VPN Aggregator Report")
+        lines.append("# VPN Aggregator Report")
         lines.append("")
         lines.append(f"- Generated at: **{ts}**")
         lines.append(f"- Raw nodes (lines before parse): **{nodes_raw}**")
         lines.append(f"- Final nodes after filters: **{len(nodes_final)}**")
         lines.append("")
 
+        # Filter stats
         lines.append("## Filter stats")
         lines.append("")
         lines.append(f"- Before: `{filter_stats.get('before')}`")
@@ -43,19 +44,40 @@ class Reporter:
         lines.append(f"- After: `{filter_stats.get('after')}`")
         lines.append("")
 
+        # Sources table
         lines.append("## Sources")
         lines.append("")
         if not source_profiles:
             lines.append("_No profiles available_")
         else:
-            lines.append("| Source | Nodes | Avg ping | Unique ASNs | Quality |")
-            lines.append("|--------|-------|----------|-------------|---------|")
+            lines.append(
+                "| Source | Nodes | EU share | Bad country share | "
+                "Avg ping | Alive ratio | Unique IPs |"
+            )
+            lines.append(
+                "|--------|-------|----------|-------------------|"
+                "----------|-------------|-----------|"
+            )
             for name, p in sorted(source_profiles.items()):
+                nodes = p.get("total_nodes") or p.get("nodes")
+                eu_share = p.get("eu_share")
+                bad_share = p.get("bad_country_share")
+                avg_ping = p.get("avg_ping")
+                alive_ratio = p.get("alive_ratio")
+                unique_ips = p.get("unique_ips")
+
+                def fmt_ratio(x):
+                    if x is None:
+                        return "-"
+                    return f"{x:.2f}"
+
                 lines.append(
-                    f"| `{name}` | {p.get('nodes')} | "
-                    f"{p.get('avg_ping') or '-'} | "
-                    f"{p.get('asn_unique') or '-'} | "
-                    f"{p.get('quality')} |"
+                    f"| `{name}` | {nodes} | "
+                    f"{fmt_ratio(eu_share)} | "
+                    f"{fmt_ratio(bad_share)} | "
+                    f"{avg_ping if avg_ping is not None else '-'} | "
+                    f"{fmt_ratio(alive_ratio)} | "
+                    f"{unique_ips if unique_ips is not None else '-'} |"
                 )
 
         report = "\n".join(lines) + "\n"
