@@ -2,12 +2,11 @@
 Enricher:
 - DNS resolve (host -> ip)
 - GeoIP (country, asn) через локальные MaxMind-базы
-- Alive/ping через TCP connect
+- Alive/ping через TCP connect (по умолчанию выключен для стабильности Actions)
 """
 
 from __future__ import annotations
 
-import os
 import socket
 import time
 from dataclasses import dataclass
@@ -25,7 +24,8 @@ class EnricherConfig:
 
     enable_dns: bool = True
     enable_geoip: bool = True
-    enable_alive: bool = True
+    # ВАЖНО: по умолчанию ping выключен, чтобы Actions не висел
+    enable_alive: bool = False
 
     # каталог и имена локальных GeoIP-баз
     db_dir: str = "data"
@@ -46,24 +46,8 @@ class EnricherConfig:
 
 class Enricher:
     def __init__(self, config: Optional[EnricherConfig] = None, debug: bool = False):
-        # если пришёл config — используем его, иначе создаём дефолтный
         self.config = config or EnricherConfig()
         self.debug = debug
-
-        # переопределения из env (для GitHub Actions и прочих раннеров)
-        max_nodes_env = os.environ.get("VPN_ENRICH_MAX_NODES")
-        if max_nodes_env is not None:
-            try:
-                self.config.max_nodes_per_run = int(max_nodes_env)
-            except ValueError:
-                pass
-
-        ping_timeout_env = os.environ.get("VPN_ENRICH_PING_TIMEOUT")
-        if ping_timeout_env is not None:
-            try:
-                self.config.ping_timeout = float(ping_timeout_env)
-            except ValueError:
-                pass
 
         self.db_dir = Path(self.config.db_dir)
         self.db_dir.mkdir(parents=True, exist_ok=True)
@@ -140,7 +124,7 @@ class Enricher:
                 except Exception:
                     extra.setdefault("asn", None)
 
-        # Alive / ping через TCP connect
+        # Alive / ping через TCP connect (по умолчанию выключено)
         if self.config.enable_alive:
             ping_ms = self._tcp_ping(ip or node.host, node.port, timeout=self.config.ping_timeout)
             if ping_ms is None:
