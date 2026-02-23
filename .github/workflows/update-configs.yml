@@ -2,9 +2,8 @@ name: Update VPN Configs
 
 on:
   schedule:
-    # Запуск каждые 6 часов
     - cron: '0 */6 * * *'
-  workflow_dispatch:  # Ручной запуск
+  workflow_dispatch:
   push:
     branches: [ main ]
     paths:
@@ -23,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0   # важно для pull --rebase
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -52,29 +51,27 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "🔄 Auto-update VPN configs [$(date -u +'%Y-%m-%d %H:%M UTC')]"
+          git commit -m "Auto-update VPN configs"
       
-      - name: Pull & push
+      - name: Push
         run: |
-          git pull --rebase origin main
-          git push origin main
+          git push origin HEAD:main
       
       - name: Generate summary
         if: always()
         run: |
-          echo "## 📊 VPN Config Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## VPN Config Update Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -d "out" ]; then
-            echo "✅ Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Generated Files:" >> $GITHUB_STEP_SUMMARY
             find out -type f -name "*.txt" -o -name "*.yaml" | while read file; do
               size=$(wc -l < "$file" 2>/dev/null || echo "0")
               echo "- \`$file\` ($size lines)" >> $GITHUB_STEP_SUMMARY
             done
-          else:
-            echo "⚠️ No output directory found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No output directory found" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🕐 Updated: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
 
