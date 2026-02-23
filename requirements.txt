@@ -6,3 +6,5 @@ geoip2>=4.7.0
 maxminddb>=2.2.0
 colorlog>=6.8.0
 python-dotenv>=1.0.0
+
+
