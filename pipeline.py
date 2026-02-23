@@ -23,7 +23,7 @@ from typing import List
 import requests
 import yaml
 
-from scripts.enricher import Enricher, EnricherConfig
+from scripts.enricher import Enricher
 from scripts.filters import NodeFilter
 from scripts.parser import ConfigParser, VPNNode
 from scripts.profiler import Profiler
@@ -48,10 +48,7 @@ class VPNAggregatorPipeline:
         self.base_out = Path(out_cfg.get("base_path", "./out"))
 
         self.parser = ConfigParser()
-        self.enricher = Enricher(
-            config=EnricherConfig(enable_alive=False),
-            debug=self.debug,
-        )
+        self.enricher = Enricher(debug=self.debug)
         self.filterer = NodeFilter(self.config)
         self.profiler = Profiler(
             min_nodes=self.min_nodes_per_source,
@@ -162,7 +159,7 @@ class VPNAggregatorPipeline:
     # ── шаг 3: Enrich ────────────────────────────────────────
 
     def _step3_enrich(self) -> None:
-        print("\n[3/7] Enriching nodes (DNS + GeoIP)...")
+        print("\n[3/7] Enriching nodes (DNS + GeoIP + alive)...")
         if not self.nodes:
             print("    ! No nodes to enrich")
             return
