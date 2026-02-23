@@ -40,8 +40,6 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VPN_ENRICH_MAX_NODES: "5000"        # лимит нод для DNS+GeoIP+ping
-          VPN_ENRICH_PING_TIMEOUT: "0.7"      # таймаут TCP ping в секундах
         run: |
           python pipeline.py
       
