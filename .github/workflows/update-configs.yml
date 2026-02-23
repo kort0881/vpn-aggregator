@@ -46,7 +46,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add output/
+          git add out/
           git diff --quiet && git diff --staged --quiet || (git commit -m "🔄 Auto-update VPN configs [$(date +'%Y-%m-%d %H:%M UTC')]" && git push)
       
       - name: Generate summary
@@ -54,11 +54,11 @@ jobs:
         run: |
           echo "## 📊 VPN Config Update Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -d "output" ]; then
+          if [ -d "out" ]; then
             echo "✅ Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Generated Files:" >> $GITHUB_STEP_SUMMARY
-            find output -type f -name "*.txt" -o -name "*.yaml" | while read file; do
+            find out -type f -name "*.txt" -o -name "*.yaml" | while read file; do
               size=$(wc -l < "$file" 2>/dev/null || echo "0")
               echo "- \`$file\` ($size lines)" >> $GITHUB_STEP_SUMMARY
             done
