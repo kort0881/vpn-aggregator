@@ -2,7 +2,26 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 5000
+- XX: 2149
+- US: 624
+- DE: 568
+- NL: 206
+- RU: 192
+- IR: 168
+- FR: 166
+- GB: 110
+- FI: 72
+- HK: 58
+- SG: 51
+- KR: 38
+- AE: 37
+- SE: 35
+- CA: 35
+- TR: 33
+- KZ: 31
+- LV: 31
+- LT: 25
+- MD: 25
 
 ## Top ASNs
 - AS13335 Cloudflare, Inc.: 1461
