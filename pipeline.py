@@ -4,13 +4,15 @@
 
   1. load_config  — читаем config.yaml
   2. ingest       — качаем источники → sources_raw/*.txt
-  3. parse        — парсим в VPNNode[] (без обогащения/фильтров)
-  4. status       — пишем краткий статус в out/status.txt
+  3. parse        — парсим в VPNNode[]
+  4. enrich-lite  — только DNS resolve (без GeoIP и ping), с лимитом в CI
+  5. status       — пишем краткий статус в out/status.txt
 """
 
 from __future__ import annotations
 
 import datetime
+import os
 from pathlib import Path
 from typing import List
 
@@ -18,6 +20,7 @@ import requests
 import yaml
 
 from scripts.parser import ConfigParser, VPNNode
+from scripts.enricher import Enricher, EnricherConfig
 
 
 SOURCES_RAW_DIR = Path("sources_raw")
@@ -40,7 +43,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def ingest_sources(cfg: dict) -> None:
-    print("\n[1/3] Ingesting sources...")
+    print("\n[1/4] Ingesting sources...")
     SOURCES_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     sources_cfg = cfg.get("sources", {}) or {}
@@ -83,7 +86,7 @@ def ingest_sources(cfg: dict) -> None:
 
 
 def parse_sources(parser: ConfigParser) -> List[VPNNode]:
-    print("\n[2/3] Parsing & normalising...")
+    print("\n[2/4] Parsing & normalising...")
     if not SOURCES_RAW_DIR.exists():
         print("    sources_raw/ does not exist, nothing to parse")
         return []
@@ -108,19 +111,46 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
     return all_nodes
 
 
+def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
+    print("\n[3/4] Enriching nodes (DNS only)...")
+    if not nodes:
+        print("    no nodes to enrich")
+        return
+
+    cfg = EnricherConfig()
+    # DNS включен, GeoIP и ping — нет
+    cfg.enable_dns = True
+    cfg.enable_geoip = False
+    cfg.enable_alive = False
+
+    # В CI режем объём и таймауты
+    if os.environ.get("CI"):
+        cfg.max_nodes_per_run = 1000  # обогащаем только верхние 1000 нод
+        cfg.dns_timeout = 2.0
+
+    enricher = Enricher(config=cfg, debug=False)
+    enricher.enrich_all(nodes)
+
+    with_ip = sum(1 for n in nodes if n.extra.get("ip"))
+    print(f"    → nodes total: {len(nodes)}  with ip: {with_ip}")
+
+
 def write_status(nodes: List[VPNNode]) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     status_file = OUT_DIR / "status.txt"
     now = datetime.datetime.utcnow().isoformat()
+    with_ip = sum(1 for n in nodes if n.extra.get("ip"))
     status_file.write_text(
-        f"Last run: {now}Z\nParsed nodes: {len(nodes)}\n",
+        f"Last run: {now}Z\n"
+        f"Parsed nodes: {len(nodes)}\n"
+        f"With IP (after DNS): {with_ip}\n",
         encoding="utf-8",
     )
-    print(f"\n[3/3] wrote {status_file}")
+    print(f"\n[4/4] wrote {status_file}")
 
 
 def main() -> None:
-    print(">>> pipeline.py started (config + ingest + parse)")
+    print(">>> pipeline.py started (config + ingest + parse + enrich-dns)")
 
     cfg = load_config()
     ingest_sources(cfg)
@@ -128,9 +158,15 @@ def main() -> None:
     parser = ConfigParser()
     nodes = parse_sources(parser)
 
+    enrich_nodes_dns_only(nodes)
+
     write_status(nodes)
 
     print(">>> pipeline.py finished")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
