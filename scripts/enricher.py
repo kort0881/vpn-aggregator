@@ -48,17 +48,12 @@ class Enricher:
 
         # Настройки под CI: агрессивный лимит и отключенный ping
         if os.environ.get("CI"):
-            # DNS + GeoIP в CI, но только по части нод
             if self.config.max_nodes_per_run <= 0:
-                # по умолчанию обрабатываем не более 3000 нод
-                self.config.max_nodes_per_run = 3000
-            # короткий таймаут на любые блокирующие сетевые операции
+                self.config.max_nodes_per_run = 3000  # GeoIP только по верхним 3000 нод
             if self.config.dns_timeout > 2.0:
                 self.config.dns_timeout = 2.0
-            # ping в CI не включаем
             self.config.enable_alive = False
 
-        # Устанавливаем таймаут DNS на уровне socket, если задан
         if self.config.dns_timeout:
             socket.setdefaulttimeout(self.config.dns_timeout)
 
@@ -72,7 +67,6 @@ class Enricher:
         self._geo_asn: Optional[geoip2.database.Reader] = None
 
         if self.config.enable_geoip:
-            # Country DB
             if self.country_db_path.exists():
                 try:
                     self._geo_country = geoip2.database.Reader(str(self.country_db_path))
@@ -85,7 +79,6 @@ class Enricher:
                 if self.debug:
                     print(f"      [GeoIP] country DB not found at {self.country_db_path}")
 
-            # ASN DB
             if self.asn_db_path.exists():
                 try:
                     self._geo_asn = geoip2.database.Reader(str(self.asn_db_path))
@@ -128,9 +121,8 @@ class Enricher:
             if self._geo_country:
                 try:
                     c = self._geo_country.country(ip)
-                    extra["country"] = c.country.iso_code
+                    extra["country"] = c.country.iso_code or "XX"
                 except Exception:
-                    # если не нашли, помечаем как неизвестную страну
                     extra.setdefault("country", "XX")
 
             if self._geo_asn:
@@ -166,3 +158,4 @@ class Enricher:
             return (end - start) * 1000.0
         except Exception:
             return None
+
