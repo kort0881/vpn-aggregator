@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import geoip2.database
-# import requests  # можно удалить, если автозагрузка .mmdb не нужна
+# import requests  # можно добавить, если захочешь автозагрузку .mmdb
 
 from .parser import VPNNode
 
@@ -37,11 +37,11 @@ class EnricherConfig:
     asn_db_url: str = ""
 
     # лимит на количество нод для энричмента за один прогон
-    # чтобы шаг не зависал на десятках тысяч ключей
-    max_nodes_per_run: int = 1000
+    # 0 = без лимита (по всем нодам)
+    max_nodes_per_run: int = 0
 
-    # таймаут TCP-ping (чем меньше, тем быстрее отбрасываются мёртвые)
-    ping_timeout: float = 0.8
+    # таймаут TCP-ping
+    ping_timeout: float = 1.0
 
 
 class Enricher:
@@ -140,7 +140,7 @@ class Enricher:
         except Exception:
             return None
 
-    def _tcp_ping(self, host: str, port: int, timeout: float = 0.8) -> Optional[float]:
+    def _tcp_ping(self, host: str, port: int, timeout: float = 1.0) -> Optional[float]:
         """Простой TCP 'ping' — время установления TCP-соединения в мс."""
         try:
             start = time.monotonic()
