@@ -6,7 +6,7 @@ pipeline.py
 Шаги:
   1. Ingest      — скачать источники из config.yaml → sources_raw/
   2. Parse       — разобрать все *.txt в VPNNode[]
-  3. Enrich      — резолв IP, GeoIP, alive/ping
+  3. Enrich      — резолв IP, GeoIP (без ping в Actions)
   4. Filter      — geo / performance / asn_blacklist + dedup
   5. Profile     — метрики по источникам и провайдерам → sources_meta/profiles/, sources_meta/providers/
   6. Repack      — rebuild URI + remark + base64 → out/
@@ -50,24 +50,10 @@ class VPNAggregatorPipeline:
 
         self.parser = ConfigParser()
 
-        # Конфиг Enricher: по умолчанию полный, но с возможностью переопределения через env
+        # Enricher: DNS + GeoIP, ping по умолчанию выключен (enable_alive=False в config)
         enrich_cfg = EnricherConfig()
-        # max nodes / timeout можно задать в рантайме (например, в GitHub Actions)
-        max_nodes_env = os.environ.get("VPN_ENRICH_MAX_NODES")
-        if max_nodes_env is not None:
-            try:
-                enrich_cfg.max_nodes_per_run = int(max_nodes_env)
-            except ValueError:
-                pass
-
-        ping_timeout_env = os.environ.get("VPN_ENRICH_PING_TIMEOUT")
-        if ping_timeout_env is not None:
-            try:
-                enrich_cfg.ping_timeout = float(ping_timeout_env)
-            except ValueError:
-                pass
-
         self.enricher = Enricher(config=enrich_cfg, debug=self.debug)
+
         self.filterer = NodeFilter(self.config)
         self.profiler = Profiler(
             min_nodes=self.min_nodes_per_source,
@@ -178,7 +164,7 @@ class VPNAggregatorPipeline:
     # ── шаг 3: Enrich ────────────────────────────────────────
 
     def _step3_enrich(self) -> None:
-        print("\n[3/7] Enriching nodes (DNS + GeoIP + alive)...")
+        print("\n[3/7] Enriching nodes (DNS + GeoIP)...")
         if not self.nodes:
             print("    ! No nodes to enrich")
             return
