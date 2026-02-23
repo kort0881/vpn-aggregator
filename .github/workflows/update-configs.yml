@@ -1,0 +1,69 @@
+name: Update VPN Configs
+
+on:
+  schedule:
+    # Запуск каждые 6 часов
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Ручной запуск
+  push:
+    branches: [ main ]
+    paths:
+      - 'config.yaml'
+      - 'pipeline.py'
+      - 'scripts/**'
+
+jobs:
+  update-configs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run VPN aggregator pipeline
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python pipeline.py
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add output/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🔄 Auto-update VPN configs [$(date +'%Y-%m-%d %H:%M UTC')]" && git push)
+      
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## 📊 VPN Config Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d "output" ]; then
+            echo "✅ Pipeline completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Generated Files:" >> $GITHUB_STEP_SUMMARY
+            find output -type f -name "*.txt" -o -name "*.yaml" | while read file; do
+              size=$(wc -l < "$file" 2>/dev/null || echo "0")
+              echo "- \`$file\` ($size lines)" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "⚠️ No output directory found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🕐 Updated: $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
