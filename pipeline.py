@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-VPN pipeline под CI (итерация с фильтрами):
+VPN pipeline под CI (итерация с фильтрами и профилями):
 
   1. load_config  — читаем config.yaml
   2. ingest       — качаем источники → sources_raw/*.txt
   3. parse        — парсим в VPNNode[]
   4. enrich-lite  — только DNS resolve (без GeoIP и ping), с лимитом в CI
   5. filter       — применяем NodeFilter из config.yaml
-  6. status       — пишем краткий статус в out/status.txt
+  6. profile      — строим профили по источникам и провайдерам
+  7. status       — пишем краткий статус в out/status.txt
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ import yaml
 from scripts.parser import ConfigParser, VPNNode
 from scripts.enricher import Enricher, EnricherConfig
 from scripts.filters import NodeFilter
+from scripts.profiler import Profiler
 
 
 SOURCES_RAW_DIR = Path("sources_raw")
@@ -46,7 +48,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def ingest_sources(cfg: dict) -> None:
-    print("\n[1/5] Ingesting sources...", flush=True)
+    print("\n[1/7] Ingesting sources...", flush=True)
     SOURCES_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     sources_cfg = cfg.get("sources", {}) or {}
@@ -89,7 +91,7 @@ def ingest_sources(cfg: dict) -> None:
 
 
 def parse_sources(parser: ConfigParser) -> List[VPNNode]:
-    print("\n[2/5] Parsing & normalising...", flush=True)
+    print("\n[2/7] Parsing & normalising...", flush=True)
     if not SOURCES_RAW_DIR.exists():
         print("    sources_raw/ does not exist, nothing to parse", flush=True)
         return []
@@ -118,7 +120,7 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
 
 
 def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
-    print("\n[3/5] Enriching nodes (DNS only)...", flush=True)
+    print("\n[3/7] Enriching nodes (DNS only)...", flush=True)
     if not nodes:
         print("    no nodes to enrich", flush=True)
         return
@@ -149,7 +151,7 @@ def enrich_nodes_dns_only(nodes: List[VPNNode]) -> None:
 
 
 def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]:
-    print("\n[4/5] Applying filters...", flush=True)
+    print("\n[4/7] Applying filters...", flush=True)
     if not nodes:
         print("    no nodes to filter", flush=True)
         return nodes, {
@@ -181,7 +183,43 @@ def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]
     return filtered, stats
 
 
-def write_status(nodes_before: int, nodes_after: int, with_ip: int) -> None:
+def build_profiles(cfg: dict, nodes: List[VPNNode]) -> dict:
+    print("\n[5/7] Building profiles (sources + providers)...", flush=True)
+    if not nodes:
+        print("    no nodes to profile", flush=True)
+        return {"by_source": {}, "by_provider": {}}
+
+    quality = cfg.get("quality_metrics", {}) or {}
+    min_nodes_per_source = quality.get("min_nodes_per_source", 5)
+
+    profiler = Profiler(
+        min_nodes=min_nodes_per_source,
+        config=cfg,
+    )
+    profiles = profiler.build_profiles(nodes)
+
+    by_source = profiles.get("by_source", {})
+    by_provider = profiles.get("by_provider", {})
+
+    print(
+        f"    → source profiles: {len(by_source)} saved to sources_meta/profiles/",
+        flush=True,
+    )
+    print(
+        f"    → provider profiles: {len(by_provider)} saved to sources_meta/providers/",
+        flush=True,
+    )
+
+    return profiles
+
+
+def write_status(
+    nodes_before: int,
+    nodes_after: int,
+    with_ip: int,
+    sources_count: int,
+    providers_count: int,
+) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     status_file = OUT_DIR / "status.txt"
     now = datetime.datetime.utcnow().isoformat()
@@ -189,14 +227,19 @@ def write_status(nodes_before: int, nodes_after: int, with_ip: int) -> None:
         f"Last run: {now}Z\n"
         f"Parsed nodes: {nodes_before}\n"
         f"With IP (after DNS): {with_ip}\n"
-        f"After filters: {nodes_after}\n",
+        f"After filters: {nodes_after}\n"
+        f"Source profiles: {sources_count}\n"
+        f"Provider profiles: {providers_count}\n",
         encoding="utf-8",
     )
-    print(f"\n[5/5] wrote {status_file}", flush=True)
+    print(f"\n[7/7] wrote {status_file}", flush=True)
 
 
 def main() -> None:
-    print(">>> pipeline.py started (config + ingest + parse + enrich-dns + filter)", flush=True)
+    print(
+        ">>> pipeline.py started (config + ingest + parse + enrich-dns + filter + profile)",
+        flush=True,
+    )
 
     cfg = load_config()
     ingest_sources(cfg)
@@ -211,7 +254,11 @@ def main() -> None:
     nodes_filtered, stats = apply_filters(cfg, nodes)
     nodes_after = len(nodes_filtered)
 
-    write_status(nodes_before, nodes_after, with_ip)
+    profiles = build_profiles(cfg, nodes_filtered)
+    sources_count = len(profiles.get("by_source", {}))
+    providers_count = len(profiles.get("by_provider", {}))
+
+    write_status(nodes_before, nodes_after, with_ip, sources_count, providers_count)
 
     print(">>> pipeline.py finished", flush=True)
 
