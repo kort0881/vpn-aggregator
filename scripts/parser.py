@@ -39,7 +39,6 @@ class ConfigParser:
             else:
                 uri_part, remark = uri, ""
 
-            # здесь был баг: '\\d+' вместо '\d+'
             match = re.match(r"vless://([^@]+)@([^:]+):(\d+)(.*)", uri_part)
             if not match:
                 return None
@@ -152,7 +151,7 @@ class ConfigParser:
     def parse_text(self, text: str, source: str = "unknown") -> List[VPNNode]:
         """
         Parse whole text block into list of VPNNode.
-        Каждой ноде проставляем extra['source_name'].
+        Каждой ноде проставляем extra['source_name'] и базовый extra['provider_id'].
         """
         nodes: List[VPNNode] = []
         for line in text.splitlines():
@@ -162,7 +161,12 @@ class ConfigParser:
             node = self.parse(line)
             if not node:
                 continue
+
+            # базовый источник = имя файла/агрегатора
             node.extra.setdefault("source_name", source)
+            # базовый провайдер = тот же, пока нет hunter'а
+            node.extra.setdefault("provider_id", source)
+
             nodes.append(node)
         return nodes
 
