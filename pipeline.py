@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-pipeline.py
-Главный оркестратор VPN Aggregator Pipeline.
-
-Шаги:
-  1. Ingest      — скачать источники из config.yaml → sources_raw/
-  2. Parse       — разобрать все *.txt в VPNNode[]
-  3. Enrich      — резолв IP, GeoIP (без ping в Actions)
-  4. Filter      — geo / performance / asn_blacklist + dedup
-  5. Profile     — метрики по источникам и провайдерам → sources_meta/profiles/, sources_meta/providers/
-  6. Repack      — rebuild URI + remark + base64 → out/
-  7. Report      — markdown summary → sources_meta/pipeline_report.md
-"""
 
 from __future__ import annotations
 
@@ -39,7 +26,7 @@ class VPNAggregatorPipeline:
         self.config = self._load_config()
 
         app = self.config.get("app", {}) or {}
-        self.debug = app.get("debug", False)
+        self.debug = app.get("debug", True)  # сразу включаем debug
         self.brand = app.get("brand_name", "@vpn")
 
         quality = self.config.get("quality_metrics", {}) or {}
@@ -50,7 +37,6 @@ class VPNAggregatorPipeline:
 
         self.parser = ConfigParser()
 
-        # Enricher: DNS + GeoIP, ping по умолчанию выключен (enable_alive=False в config)
         enrich_cfg = EnricherConfig()
         self.enricher = Enricher(config=enrich_cfg, debug=self.debug)
 
@@ -80,8 +66,6 @@ class VPNAggregatorPipeline:
         elapsed = time.monotonic() - t_start
         self._banner(f"Done in {elapsed:.1f}s  |  {len(self.nodes)} nodes in out/")
 
-    # ── шаг 1: Ingest ────────────────────────────────────────
-
     def _step1_ingest(self) -> None:
         print("\n[1/7] Ingesting sources...")
         raw_dir = Path("sources_raw")
@@ -110,9 +94,9 @@ class VPNAggregatorPipeline:
                 try:
                     resp = requests.get(
                         url,
-                        timeout=25,
+                        timeout=5,  # короткий таймаут, чтобы не висеть [web:309]
                         headers={"User-Agent": "Mozilla/5.0"},
-                        allow_redirects=True,
+                        allow_redirects=False,
                     )
                     resp.raise_for_status()
                     ct = resp.headers.get("Content-Type", "")
@@ -127,12 +111,11 @@ class VPNAggregatorPipeline:
                     print(f"      ✗ {name}: {exc}")
                     total_fail += 1
 
+            print(f"    done group {group_name}")
+
         print(f"    → fetched: {total_ok}  failed: {total_fail}")
 
-    # ── шаг 2: Parse ─────────────────────────────────────────
-
     def _step2_parse(self) -> int:
-        """Вернуть суммарное количество разобранных строк (до фильтрации)."""
         print("\n[2/7] Parsing & normalising...")
         raw_dir = Path("sources_raw")
         if not raw_dir.exists():
@@ -161,16 +144,12 @@ class VPNAggregatorPipeline:
         print(f"    → raw lines: {total_raw}  nodes parsed: {len(self.nodes)}")
         return len(self.nodes)
 
-    # ── шаг 3: Enrich ────────────────────────────────────────
-
     def _step3_enrich(self) -> None:
-        print("\n[3/7] Enriching nodes (DNS + GeoIP)...")
+        print("\n[3/7] Enriching nodes (DNS + GeoIP, no ping)...")
         if not self.nodes:
             print("    ! No nodes to enrich")
             return
         self.enricher.enrich_all(self.nodes)
-
-    # ── шаг 4: Filter ────────────────────────────────────────
 
     def _step4_filter(self) -> dict:
         print("\n[4/7] Filtering...")
@@ -190,8 +169,6 @@ class VPNAggregatorPipeline:
         )
         return stats
 
-    # ── шаг 5: Profile ───────────────────────────────────────
-
     def _step5_profile(self) -> dict:
         print("\n[5/7] Building profiles (sources + providers)...")
         profiles = self.profiler.build_profiles(self.nodes)
@@ -208,13 +185,9 @@ class VPNAggregatorPipeline:
 
         return profiles
 
-    # ── шаг 6: Repack ────────────────────────────────────────
-
     def _step6_repack(self) -> None:
         print("\n[6/7] Repacking & branding...")
         self.repacker.repack(self.nodes)
-
-    # ── шаг 7: Report ────────────────────────────────────────
 
     def _step7_report(self, raw_count: int, filter_stats: dict, profiles: dict) -> None:
         print("\n[7/7] Generating report...")
@@ -232,8 +205,6 @@ class VPNAggregatorPipeline:
                 Path(ghs).open("a", encoding="utf-8").write(report)
             except Exception:
                 pass
-
-    # ── утилиты ──────────────────────────────────────────────
 
     def _load_config(self) -> dict:
         try:
