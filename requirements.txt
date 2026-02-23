@@ -15,5 +15,5 @@ colorlog>=6.8.0
 python-dotenv>=1.0.0
 
 # Data parsing
-base64
+
 json
