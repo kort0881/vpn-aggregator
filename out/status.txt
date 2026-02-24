@@ -1,9 +1,9 @@
-Last run: 2026-02-24T08:05:50.602578Z
-Parsed nodes: 108691
-With IP (after enrich): 2756
-With country (after GeoIP): 2756
-After filters: 32296
+Last run: 2026-02-24T13:21:51.646408Z
+Parsed nodes: 113999
+With IP (after enrich): 2753
+With country (after GeoIP): 2753
+After filters: 32207
 Source profiles: 33
 Provider profiles: 33
-Top countries: XX:31830, DE:218, FR:59, FI:54, NL:50
-Top ASNs: AS24940 Hetzner Online GmbH:116, AS16509 Amazon.com, Inc.:79, AS43581 Ztv Corp LLC:37, AS13335 Cloudflare, Inc.:17, AS209242 Cloudflare London, LLC:17
+Top countries: XX:31793, DE:211, FR:55, NL:43, FI:28
+Top ASNs: AS24940 Hetzner Online GmbH:118, AS16509 Amazon.com, Inc.:75, AS13335 Cloudflare, Inc.:18, AS209242 Cloudflare London, LLC:17, AS14061 DigitalOcean, LLC:13
