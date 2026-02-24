@@ -22,6 +22,10 @@ class VPNNode:
     sni: Optional[str] = None
     extra: Dict = field(default_factory=dict)
 
+    def to_uri(self) -> str:
+        """Convert VPNNode to URI string"""
+        return ConfigParser.rebuild_uri(self)
+
 
 class ConfigParser:
     """Parser for VPN configs"""
