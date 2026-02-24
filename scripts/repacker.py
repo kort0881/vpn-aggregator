@@ -27,8 +27,8 @@ class Repacker:
 
         for node in nodes:
             uri = node.to_uri()  # предполагаем, что VPNNode умеет собирать URI
-            t = node.type  # 'vless' / 'vmess' / 'ss'
-            by_type[t].append(uri)
+            t = node.protocol  # 'vless' / 'vmess' / 'ss'           
+                        by_type[t].append(uri)
 
             extra = node.extra or {}
             country = extra.get("country") or "XX"
