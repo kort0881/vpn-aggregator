@@ -20,7 +20,8 @@ Profiler:
   "alive_ratio": float|None,
   "last_seen": ISO8601,
   "score": float,
-  "tags": [ ... ]
+  "tags": [ ... ],
+  "source_type": "first_party" | "aggregator" | "unknown"
 }
 """
 
@@ -31,7 +32,7 @@ from collections import defaultdict, Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, median
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Callable
 
 from .parser import VPNNode
 
@@ -115,7 +116,7 @@ class Profiler:
     def _build_grouped_profiles(
         self,
         nodes: List[VPNNode],
-        group_key_fn,
+        group_key_fn: Callable[[VPNNode], str],
         out_dir: Path,
         now_iso: str,
     ) -> Dict[str, Dict[str, Any]]:
@@ -220,6 +221,18 @@ class Profiler:
             total_nodes=total_nodes,
         )
 
+        source_type = self._classify_source_type(
+            total_nodes=total_nodes,
+            unique_ips=unique_ips,
+            asn_stats=asn_stats,
+        )
+
+        # добавляем тип источника в теги для удобного поиска
+        if source_type == "first_party":
+            tags.append("first_party_like")
+        elif source_type == "aggregator":
+            tags.append("aggregator_like")
+
         profile = {
             "id": entity_id,
             "total_nodes": total_nodes,
@@ -234,8 +247,53 @@ class Profiler:
             "last_seen": last_seen_iso or now_iso,
             "score": score,
             "tags": tags,
+            "source_type": source_type,
         }
         return profile
+
+    # ──────────────────────────────────────────────────────
+    # Классификация: первоисточник vs агрегатор
+    # ──────────────────────────────────────────────────────
+
+    def _classify_source_type(
+        self,
+        total_nodes: int,
+        unique_ips: int,
+        asn_stats: Dict[int, int],
+    ) -> str:
+        """
+        Возвращает:
+          - 'first_party'  — похоже на свои сервера/панель
+          - 'aggregator'   — похоже на сборник чужих конфигов
+          - 'unknown'      — неясно
+        Эвристики:
+          - first_party: высокий перекос в один ASN, относительно низкое разнообразие IP
+          - aggregator: много разных ASN и почти каждый узел с уникальным IP
+        """
+        if total_nodes < 10:
+            return "unknown"
+
+        total_nodes_f = float(total_nodes)
+        ip_diversity = unique_ips / total_nodes_f if total_nodes > 0 else 0.0
+
+        if asn_stats:
+            top_asn_count = max(asn_stats.values())
+            asn_concentration = top_asn_count / total_nodes_f
+            asn_diversity = len(asn_stats)
+        else:
+            asn_concentration = 0.0
+            asn_diversity = 0
+
+        # Кандидат в первоисточники: один-два ASN тянут 70%+ узлов,
+        # IP диверсификация не экстремально высокая.
+        if asn_concentration >= 0.7 and ip_diversity <= 0.4:
+            return "first_party"
+
+        # Явный агрегатор: очень много разных ASN и почти каждый IP уникален.
+        if asn_diversity >= 15 and ip_diversity >= 0.75:
+            return "aggregator"
+
+        return "unknown"
 
     # ──────────────────────────────────────────────────────
     # Score + теги
@@ -270,4 +328,3 @@ class Profiler:
             tags.append("blacklist_candidate")
 
         return score, tags
-
