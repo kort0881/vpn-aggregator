@@ -9,7 +9,8 @@ VPN pipeline под CI (боевой с GeoIP):
   5. filter       — применяем NodeFilter из config.yaml
   6. profile      — строим профили по источникам и провайдерам
   7. repack       — генерим сабы в out/ по отфильтрованным нодам
-  8. status       — пишем краткий статус и GeoIP-сводку в out/status.txt
+  8. build_subs   — собираем EU-подписки и короткие ссылки в out/subscriptions_list.txt
+  9. status       — пишем краткий статус и GeoIP-сводку в out/status.txt
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def ingest_sources(cfg: dict) -> None:
-    print("\n[1/8] Ingesting sources...", flush=True)
+    print("\n[1/9] Ingesting sources...", flush=True)
     SOURCES_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
     sources_cfg = cfg.get("sources", {}) or {}
@@ -93,7 +94,7 @@ def ingest_sources(cfg: dict) -> None:
 
 
 def parse_sources(parser: ConfigParser) -> List[VPNNode]:
-    print("\n[2/8] Parsing & normalising...", flush=True)
+    print("\n[2/9] Parsing & normalising...", flush=True)
     if not SOURCES_RAW_DIR.exists():
         print("    sources_raw/ does not exist, nothing to parse", flush=True)
         return []
@@ -122,7 +123,7 @@ def parse_sources(parser: ConfigParser) -> List[VPNNode]:
 
 
 def enrich_nodes_dns_geoip(nodes: List[VPNNode]) -> Tuple[int, int]:
-    print("\n[3/8] Enriching nodes (DNS + GeoIP)...", flush=True)
+    print("\n[3/9] Enriching nodes (DNS + GeoIP)...", flush=True)
     if not nodes:
         print("    no nodes to enrich", flush=True)
         return 0, 0
@@ -151,7 +152,7 @@ def enrich_nodes_dns_geoip(nodes: List[VPNNode]) -> Tuple[int, int]:
 
 
 def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]:
-    print("\n[4/8] Applying filters...", flush=True)
+    print("\n[4/9] Applying filters...", flush=True)
     if not nodes:
         print("    no nodes to filter", flush=True)
         return nodes, {
@@ -184,7 +185,7 @@ def apply_filters(cfg: dict, nodes: List[VPNNode]) -> Tuple[List[VPNNode], dict]
 
 
 def build_profiles(cfg: dict, nodes: List[VPNNode]) -> dict:
-    print("\n[5/8] Building profiles (sources + providers)...", flush=True)
+    print("\n[5/9] Building profiles (sources + providers)...", flush=True)
     if not nodes:
         print("    no nodes to profile", flush=True)
         return {"by_source": {}, "by_provider": {}}
@@ -214,7 +215,7 @@ def build_profiles(cfg: dict, nodes: List[VPNNode]) -> dict:
 
 
 def repack_outputs(cfg: dict, nodes: List[VPNNode]) -> None:
-    print("\n[6/8] Repacking & generating outputs...", flush=True)
+    print("\n[6/9] Repacking & generating outputs...", flush=True)
     if not nodes:
         print("    no nodes to repack", flush=True)
         return
@@ -222,6 +223,25 @@ def repack_outputs(cfg: dict, nodes: List[VPNNode]) -> None:
     repacker = Repacker(cfg)
     repacker.repack(nodes)
     print("    → repack finished, out/ updated", flush=True)
+
+
+def build_eu_subscriptions() -> None:
+    """
+    Шаг 8: генерация EU-подписок и списка коротких ссылок в out/subscriptions_list.txt.
+    Ожидается, что в корне есть build_eu_subscriptions_list.py с функцией main().
+    """
+    try:
+        from build_eu_subscriptions_list import main as build_eu_subs_main
+    except ImportError as e:
+        print(f"\n[7/9] build_eu_subscriptions_list.py not found or import error: {e}", flush=True)
+        return
+
+    print("\n[7/9] Building EU subscriptions list...", flush=True)
+    try:
+        rc = build_eu_subs_main()
+        print(f"    → build_eu_subscriptions_list finished with code {rc}", flush=True)
+    except Exception as e:
+        print(f"    !!! error in build_eu_subscriptions_list: {e}", flush=True)
 
 
 def collect_geoip_summary(nodes: List[VPNNode], top_n: int = 5) -> Tuple[str, str]:
@@ -274,12 +294,12 @@ def write_status(
         f"Top ASNs: {top_asn}\n",
         encoding="utf-8",
     )
-    print(f"\n[8/8] wrote {status_file}", flush=True)
+    print("\n[9/9] wrote", status_file, flush=True)
 
 
 def main() -> None:
     print(
-        ">>> pipeline.py started (config + ingest + parse + enrich-geoip + filter + profile + repack)",
+        ">>> pipeline.py started (config + ingest + parse + enrich-geoip + filter + profile + repack + build_subs + status)",
         flush=True,
     )
 
@@ -300,6 +320,9 @@ def main() -> None:
     providers_count = len(profiles.get("by_provider", {}))
 
     repack_outputs(cfg, nodes_filtered)
+
+    # новый шаг: собираем EU-подписки и subscriptions_list.txt
+    build_eu_subscriptions()
 
     top_countries, top_asn = collect_geoip_summary(nodes_filtered)
 
