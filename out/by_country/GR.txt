@@ -1,1 +1,1 @@
-vless://14818654-7689-453a-9a1f-4c72f89782d5@spb-node.genadata.online:2040?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=178.253.43.200&country=GR&asn=9123&asn_name=Jsc timeweb#@v2rays_ha
+vless://14818654-7689-453a-9a1f-4c72f89782d5@spb-node.genadata.online:2040?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=178.253.43.200&country=GR&asn=9123&asn_name=Jsc timeweb#🌐
