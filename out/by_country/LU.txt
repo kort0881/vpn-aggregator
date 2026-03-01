@@ -1,2 +1,1 @@
-vless://0f494b87-2fdd-4978-b467-04f58d7375ce@80.93.223.61:80?type=ws&host=ipcfgermany.dev&path=🔒&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=80.93.223.61&country=LU&asn=202422&asn_name=G-Core Labs S.A.
-vless://1068814a-6d43-40d9-a127-0f6b6b77ccfc@109.61.16.89:30938?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=109.61.16.89&country=LU&asn=None
+vless://2cd6ed0f-636e-4e6c-9449-5a263d7a0fa5@188.42.89.4:443?security=tls&sni=cfed.tgzdyz2.top&type=ws&path=tg@zdyz2&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=188.42.89.4&country=LU&asn=209242&asn_name=Cloudflare London, LLC#@Hope_Net-join-us-on-Telegram
