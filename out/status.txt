@@ -1,9 +1,9 @@
-Last run: 2026-03-01T18:42:42.757271Z
-Parsed nodes: 84873
-With IP (after enrich): 2880
-With country (after GeoIP): 2880
-After filters: 28905
-Source profiles: 31
-Provider profiles: 31
-Top countries: XX:28556, DE:141, NL:60, FR:53, FI:30
-Top ASNs: AS24940 Hetzner Online GmbH:61, AS16509 Amazon.com, Inc.:47, AS16276 OVH SAS:33, AS12876 Scaleway S.a.s.:19, AS209847 WorkTitans B.V.:17
+Last run: 2026-03-02T02:39:43.421042Z
+Parsed nodes: 87886
+With IP (after enrich): 2812
+With country (after GeoIP): 2812
+After filters: 29162
+Source profiles: 32
+Provider profiles: 32
+Top countries: XX:28812, DE:143, NL:60, FR:53, FI:29
+Top ASNs: AS24940 Hetzner Online GmbH:60, AS16509 Amazon.com, Inc.:47, AS16276 OVH SAS:33, AS12876 Scaleway S.a.s.:19, AS209847 WorkTitans B.V.:18
