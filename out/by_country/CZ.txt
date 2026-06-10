@@ -1,2 +1,1 @@
 vless://0132166f-e702-48ed-a9e7-b07af768faf8@195.85.23.251:8880?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=195.85.23.251&country=CZ&asn=209242&asn_name=Cloudflare London, LLC
-vless://02b92210-c4b8-4052-974f-62874a3a34fa@ru.jykvpn.com:80?mode=gun&security=none&encryption=none&type=grpc&serviceName=vless&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=194.87.86.198&country=CZ&asn=9123&asn_name=Jsc timeweb
