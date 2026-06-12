@@ -1,9 +1,9 @@
-Last run: 2026-06-12T04:42:48.239064Z
-Parsed nodes: 630149
-With IP (after enrich): 2786
-With country (after GeoIP): 2786
-After filters: 79682
+Last run: 2026-06-12T10:25:32.845266Z
+Parsed nodes: 632828
+With IP (after enrich): 2779
+With country (after GeoIP): 2779
+After filters: 80180
 Source profiles: 98
 Provider profiles: 98
-Top countries: XX:79421, DE:156, NL:23, SE:18, FI:18
-Top ASNs: AS213535 YottaSrc:82, AS24940 Hetzner Online GmbH:42, AS209242 Cloudflare London, LLC:17, AS13335 Cloudflare, Inc.:12, AS210644 Aeza International Ltd:10
+Top countries: XX:79914, DE:160, NL:23, FI:19, SE:18
+Top ASNs: AS213535 YottaSrc:82, AS24940 Hetzner Online GmbH:45, AS209242 Cloudflare London, LLC:17, AS13335 Cloudflare, Inc.:12, AS210644 Aeza International Ltd:10
