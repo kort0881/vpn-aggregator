@@ -1,1 +1,2 @@
 vless://0132166f-e702-48ed-a9e7-b07af768faf8@193.227.99.251:8880?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.251&country=MT&asn=209242&asn_name=Cloudflare London, LLC
+vless://029cf202-020c-42a5-8186-1a831c8322c5@193.227.99.24:80?encryption=none&security=none&type=ws&host=rain.leemurda187.xyz&path=/vless?ed=2560&Telegram🇨🇳@WangCai2&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.24&country=MT&asn=209242&asn_name=Cloudflare London, LLC
