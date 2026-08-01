@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1933
-- US: 524
-- DE: 488
+- XX: 1937
+- US: 531
+- DE: 496
+- RU: 250
 - PE: 229
-- RU: 214
-- NL: 213
-- SC: 131
-- FR: 126
-- GB: 116
-- SG: 110
-- SE: 97
-- FI: 72
-- IR: 70
-- HK: 60
-- KR: 54
-- AE: 35
-- AT: 31
-- PL: 27
-- LT: 26
-- KZ: 24
+- NL: 225
+- FR: 132
+- SC: 132
+- GB: 115
+- FI: 82
+- SG: 69
+- IR: 68
+- KR: 57
+- SE: 54
+- HK: 53
+- AE: 36
+- AT: 33
+- PL: 28
+- BR: 28
+- LT: 25
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 1190
-- AS209242 Cloudflare London, LLC: 321
+- AS13335 Cloudflare, Inc.: 1196
+- AS209242 Cloudflare London, LLC: 307
 - AS24940 Hetzner Online GmbH: 266
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS54113 Fastly, Inc.: 206
-- AS16509 Amazon.com, Inc.: 171
-- AS14061 DigitalOcean, LLC: 91
+- AS54113 Fastly, Inc.: 200
+- AS16509 Amazon.com, Inc.: 126
+- AS14061 DigitalOcean, LLC: 98
 - AS16276 OVH SAS: 89
 - AS3491 PCCW Global, Inc.: 85
-- AS210644 Aeza International Ltd: 52
-- AS3301 Telia Company AB: 46
-- AS209847 WorkTitans B.V.: 37
-- AS14197 HEALTH MARKET SCIENCE: 31
-- AS20473 The Constant Company, LLC: 25
-- AS56971 Cgi Global Limited: 22
+- AS210644 Aeza International Ltd: 56
+- AS209847 WorkTitans B.V.: 34
+- AS200350 Yandex.Cloud LLC: 31
+- AS31898 Oracle Corporation: 29
+- AS14197 HEALTH MARKET SCIENCE: 28
+- AS20473 The Constant Company, LLC: 27
+- AS56971 Cgi Global Limited: 23
+- AS60068 Datacamp Limited: 23
+- AS57043 Hostkey B.v.: 22
 - AS12876 Scaleway S.a.s.: 21
 - AS17561 LARUS Limited: 21
-- AS31898 Oracle Corporation: 20
-- AS60068 Datacamp Limited: 20
-- AS63949 Akamai Connected Cloud: 18
