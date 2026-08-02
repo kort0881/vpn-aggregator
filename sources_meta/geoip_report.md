@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1937
-- US: 531
-- DE: 496
-- RU: 250
+- XX: 1930
+- DE: 495
+- US: 483
+- RU: 273
 - PE: 229
-- NL: 225
+- NL: 222
+- SC: 134
 - FR: 132
-- SC: 132
-- GB: 115
-- FI: 82
-- SG: 69
-- IR: 68
-- KR: 57
-- SE: 54
-- HK: 53
-- AE: 36
-- AT: 33
+- GB: 106
+- FI: 92
+- SG: 80
+- IR: 70
+- SE: 60
+- HK: 57
+- KR: 56
+- AE: 43
+- BR: 39
+- AT: 32
 - PL: 28
-- BR: 28
-- LT: 25
+- LT: 24
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 1196
-- AS209242 Cloudflare London, LLC: 307
-- AS24940 Hetzner Online GmbH: 266
+- AS13335 Cloudflare, Inc.: 1191
+- AS24940 Hetzner Online GmbH: 257
+- AS209242 Cloudflare London, LLC: 247
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS54113 Fastly, Inc.: 200
-- AS16509 Amazon.com, Inc.: 126
-- AS14061 DigitalOcean, LLC: 98
-- AS16276 OVH SAS: 89
-- AS3491 PCCW Global, Inc.: 85
+- AS54113 Fastly, Inc.: 198
+- AS16509 Amazon.com, Inc.: 139
+- AS14061 DigitalOcean, LLC: 106
+- AS16276 OVH SAS: 86
+- AS3491 PCCW Global, Inc.: 86
 - AS210644 Aeza International Ltd: 56
+- AS200350 Yandex.Cloud LLC: 39
 - AS209847 WorkTitans B.V.: 34
-- AS200350 Yandex.Cloud LLC: 31
-- AS31898 Oracle Corporation: 29
-- AS14197 HEALTH MARKET SCIENCE: 28
+- AS56971 Cgi Global Limited: 32
 - AS20473 The Constant Company, LLC: 27
-- AS56971 Cgi Global Limited: 23
-- AS60068 Datacamp Limited: 23
-- AS57043 Hostkey B.v.: 22
-- AS12876 Scaleway S.a.s.: 21
-- AS17561 LARUS Limited: 21
+- AS31898 Oracle Corporation: 27
+- AS47764 LLC VK: 27
+- AS14197 HEALTH MARKET SCIENCE: 27
+- AS57043 Hostkey B.v.: 24
+- AS60068 Datacamp Limited: 22
+- AS50340 JSC Selectel: 22
