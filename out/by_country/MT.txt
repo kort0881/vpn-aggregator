@@ -1,3 +1,1 @@
 vless://0132166f-e702-48ed-a9e7-b07af768faf8@193.227.99.251:8880?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.251&country=MT&asn=209242&asn_name=Cloudflare London, LLC
-vless://11f62a8b-762d-4595-aa54-75ecb6977400@193.227.99.54:2082?path=/oopksl?&security=none&encryption=none&host=cdn.jorzel.ir&type=httpupgrade&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.54&country=MT&asn=209242&asn_name=Cloudflare London, LLC
-vless://11f62a8b-762d-4595-aa54-75ecb6977400@193.227.99.54:2086?path=/oopksl?&security=none&encryption=none&host=cdn.jorzel.ir&type=httpupgrade&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.54&country=MT&asn=209242&asn_name=Cloudflare London, LLC
