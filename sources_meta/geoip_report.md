@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1758
-- DE: 434
-- US: 407
-- RU: 237
-- PE: 229
-- NL: 220
-- SG: 184
-- GB: 142
-- SC: 133
-- FR: 104
-- KR: 104
-- IR: 81
-- HK: 80
+- XX: 1770
+- US: 416
+- DE: 408
+- PE: 230
+- SG: 201
+- RU: 195
+- NL: 193
+- GB: 158
+- SC: 138
+- KR: 117
+- FR: 105
+- IR: 86
 - FI: 79
-- SE: 71
-- BR: 64
-- AE: 48
-- AT: 40
-- TR: 35
-- JP: 31
+- BR: 78
+- SE: 75
+- HK: 66
+- AE: 54
+- TR: 43
+- AT: 39
+- JP: 37
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 1029
-- AS16509 Amazon.com, Inc.: 280
-- AS209242 Cloudflare London, LLC: 243
-- AS24940 Hetzner Online GmbH: 241
+- AS13335 Cloudflare, Inc.: 1002
+- AS16509 Amazon.com, Inc.: 304
+- AS24940 Hetzner Online GmbH: 243
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS54113 Fastly, Inc.: 156
+- AS209242 Cloudflare London, LLC: 190
+- AS54113 Fastly, Inc.: 161
 - AS3491 PCCW Global, Inc.: 86
-- AS16276 OVH SAS: 85
-- AS14061 DigitalOcean, LLC: 69
-- AS210644 Aeza International Ltd: 59
-- AS2856 British Telecommunications PLC: 35
+- AS16276 OVH SAS: 84
+- AS14061 DigitalOcean, LLC: 68
+- AS210644 Aeza International Ltd: 56
+- AS270439 D S CUPERTINO SERVICOS DE HOSPEDAGEM NA INTERNET: 48
+- AS2856 British Telecommunications PLC: 45
 - AS209847 WorkTitans B.V.: 33
-- AS270439 D S CUPERTINO SERVICOS DE HOSPEDAGEM NA INTERNET: 32
-- AS56971 Cgi Global Limited: 27
-- AS20473 The Constant Company, LLC: 25
-- AS215540 Global Connectivity Solutions Llp: 25
+- AS20473 The Constant Company, LLC: 27
+- AS56971 Cgi Global Limited: 26
+- AS215540 Global Connectivity Solutions Llp: 24
 - AS12876 Scaleway S.a.s.: 24
+- AS209693 Oc Networks Limited: 23
 - AS14197 HEALTH MARKET SCIENCE: 23
-- AS209693 Oc Networks Limited: 21
-- AS198610 Beget LLC: 21
+- AS45102 Alibaba US Technology Co., Ltd.: 22
