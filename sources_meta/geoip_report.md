@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1767
-- US: 430
-- DE: 391
-- SG: 277
+- XX: 1774
+- US: 443
+- DE: 393
+- SG: 281
 - PE: 229
-- NL: 200
-- GB: 153
-- RU: 145
-- SC: 133
-- SE: 122
-- FR: 117
+- NL: 199
+- GB: 164
+- RU: 141
+- SC: 134
+- FR: 113
 - IR: 76
-- HK: 66
-- PL: 64
+- SE: 73
+- HK: 72
+- PL: 65
 - FI: 64
-- JP: 40
-- KR: 38
-- TR: 38
+- TR: 45
+- KR: 40
+- JP: 39
 - AE: 35
-- LT: 34
+- BR: 34
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 900
-- AS16509 Amazon.com, Inc.: 307
-- AS209242 Cloudflare London, LLC: 298
+- AS13335 Cloudflare, Inc.: 895
+- AS16509 Amazon.com, Inc.: 311
+- AS209242 Cloudflare London, LLC: 297
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS24940 Hetzner Online GmbH: 217
-- AS54113 Fastly, Inc.: 143
+- AS24940 Hetzner Online GmbH: 218
+- AS54113 Fastly, Inc.: 141
 - AS3491 PCCW Global, Inc.: 87
-- AS16276 OVH SAS: 82
+- AS16276 OVH SAS: 81
 - AS14061 DigitalOcean, LLC: 61
-- AS210644 Aeza International Ltd: 48
-- AS3301 Telia Company AB: 46
+- AS210644 Aeza International Ltd: 45
 - AS63949 Akamai Connected Cloud: 33
-- AS2856 British Telecommunications PLC: 30
-- AS209847 WorkTitans B.V.: 29
-- AS56971 Cgi Global Limited: 28
-- AS20473 The Constant Company, LLC: 27
+- AS2856 British Telecommunications PLC: 32
+- AS209847 WorkTitans B.V.: 31
+- AS20473 The Constant Company, LLC: 28
+- AS56971 Cgi Global Limited: 26
 - AS12876 Scaleway S.a.s.: 26
 - AS14197 HEALTH MARKET SCIENCE: 25
+- AS209693 Oc Networks Limited: 24
 - AS31898 Oracle Corporation: 24
-- AS209693 Oc Networks Limited: 21
+- AS45102 Alibaba US Technology Co., Ltd.: 23
