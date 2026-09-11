@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1820
+- XX: 1800
 - US: 474
-- DE: 401
+- DE: 413
 - PE: 229
 - NL: 206
-- GB: 173
-- RU: 138
-- SC: 133
-- SE: 127
-- FR: 119
-- IR: 83
-- FI: 72
-- SG: 72
-- HK: 70
-- PL: 48
-- TR: 45
-- AE: 44
-- KR: 39
+- GB: 169
+- RU: 152
+- SC: 134
+- SE: 126
+- FR: 118
+- IR: 90
+- FI: 71
+- SG: 70
+- HK: 57
+- PL: 51
+- AE: 46
+- TR: 44
+- KR: 37
 - LT: 35
-- EE: 33
+- EE: 34
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 914
-- AS209242 Cloudflare London, LLC: 301
+- AS13335 Cloudflare, Inc.: 931
+- AS209242 Cloudflare London, LLC: 303
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS24940 Hetzner Online GmbH: 219
-- AS54113 Fastly, Inc.: 151
-- AS16509 Amazon.com, Inc.: 114
+- AS24940 Hetzner Online GmbH: 224
+- AS54113 Fastly, Inc.: 152
+- AS16509 Amazon.com, Inc.: 112
 - AS16276 OVH SAS: 88
 - AS3491 PCCW Global, Inc.: 87
-- AS14061 DigitalOcean, LLC: 60
-- AS210644 Aeza International Ltd: 52
+- AS14061 DigitalOcean, LLC: 61
+- AS210644 Aeza International Ltd: 51
 - AS3301 Telia Company AB: 46
-- AS2856 British Telecommunications PLC: 36
-- AS56971 Cgi Global Limited: 33
-- AS63949 Akamai Connected Cloud: 32
-- AS209847 WorkTitans B.V.: 29
+- AS2856 British Telecommunications PLC: 32
+- AS56971 Cgi Global Limited: 31
+- AS63949 Akamai Connected Cloud: 31
+- AS209847 WorkTitans B.V.: 30
 - AS12876 Scaleway S.a.s.: 26
+- AS20473 The Constant Company, LLC: 25
 - AS14197 HEALTH MARKET SCIENCE: 25
-- AS45102 Alibaba US Technology Co., Ltd.: 24
-- AS20473 The Constant Company, LLC: 23
 - AS31898 Oracle Corporation: 22
+- AS17561 LARUS Limited: 21
