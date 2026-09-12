@@ -1,1 +1,2 @@
 vless://0132166f-e702-48ed-a9e7-b07af768faf8@193.227.99.251:8880?source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.251&country=MT&asn=209242&asn_name=Cloudflare London, LLC
+vless://0e8ad9c6-3171-47cc-e3ce-5f7f3aa31da7@pro2.hx9.ir:2053?security=tls&fp=chrome&sni=media.minesm.com&type=ws&headerType=none&host=media.minesm.com&path=/&source_name=argh_v2rayauto_vless&provider_id=argh_v2rayauto_vless&ip=193.227.99.253&country=MT&asn=209242&asn_name=Cloudflare London, LLC#[🇩🇪] [vl-tl-ws] [260912-004146.702]
