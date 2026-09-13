@@ -5,8 +5,14 @@ on:
     - cron: '0 2 * * 0'  # раз в неделю, воскресенье 02:00 UTC
   workflow_dispatch:
 
+# Гарантирует, что два запуска этого workflow не пойдут одновременно.
+# Если предыдущий ещё идёт — новый встанет в очередь.
+concurrency:
+  group: pipeline-report
+  cancel-in-progress: false
+
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # убирает deprecation warning
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   pipeline-report:
@@ -36,16 +42,38 @@ jobs:
           python pipeline.py
 
       - name: Commit pipeline report if any
+        id: commit
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add sources_meta/pipeline_report.md
           if git diff --cached --quiet; then
             echo "No pipeline_report changes to commit"
-            exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Auto-update pipeline report"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-          git commit -m "Auto-update pipeline report"
 
       - name: Push
+        if: steps.commit.outputs.changed == 'true'
         run: |
-          git push origin HEAD:main
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i..."
+            # Подтягиваем свежие изменения с удалённого main и переносим свой коммит поверх
+            if ! git pull --rebase origin main; then
+              echo "Rebase failed — resolving by taking our version of the report"
+              # Если в отчёте конфликт — оставляем свою (свежую) версию
+              git checkout --ours sources_meta/pipeline_report.md
+              git add sources_meta/pipeline_report.md
+              GIT_EDITOR=true git rebase --continue
+            fi
+            if git push origin HEAD:main; then
+              echo "Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "Push failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "Push failed after 5 attempts"
+          exit 1
