@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1860
-- US: 514
-- DE: 420
+- XX: 1794
+- US: 525
+- DE: 427
 - PE: 229
-- NL: 213
-- GB: 178
-- RU: 154
+- NL: 219
+- GB: 184
+- RU: 156
 - SC: 131
-- FR: 119
-- SE: 85
-- IR: 76
-- FI: 75
-- HK: 54
-- SG: 53
-- KR: 46
-- LT: 42
-- AE: 41
+- FR: 117
+- SE: 92
+- FI: 84
+- IR: 81
+- HK: 61
+- SG: 51
+- AE: 45
+- KR: 45
+- LT: 43
 - EE: 37
 - AT: 35
-- ES: 33
+- TW: 34
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 1034
-- AS209242 Cloudflare London, LLC: 331
+- AS13335 Cloudflare, Inc.: 979
+- AS209242 Cloudflare London, LLC: 337
+- AS24940 Hetzner Online GmbH: 230
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS24940 Hetzner Online GmbH: 222
-- AS54113 Fastly, Inc.: 152
-- AS16509 Amazon.com, Inc.: 92
+- AS54113 Fastly, Inc.: 150
+- AS16509 Amazon.com, Inc.: 90
 - AS3491 PCCW Global, Inc.: 87
-- AS16276 OVH SAS: 86
-- AS14061 DigitalOcean, LLC: 66
+- AS16276 OVH SAS: 84
+- AS14061 DigitalOcean, LLC: 75
 - AS210644 Aeza International Ltd: 48
-- AS2856 British Telecommunications PLC: 34
+- AS2856 British Telecommunications PLC: 37
+- AS209847 WorkTitans B.V.: 32
 - AS56971 Cgi Global Limited: 32
-- AS209847 WorkTitans B.V.: 30
-- AS31898 Oracle Corporation: 28
-- AS63949 Akamai Connected Cloud: 28
+- AS31898 Oracle Corporation: 26
+- AS63949 Akamai Connected Cloud: 25
+- AS45102 Alibaba US Technology Co., Ltd.: 25
 - AS14197 HEALTH MARKET SCIENCE: 25
 - AS20473 The Constant Company, LLC: 24
-- AS45102 Alibaba US Technology Co., Ltd.: 23
+- AS17561 LARUS Limited: 23
 - AS12876 Scaleway S.a.s.: 22
-- AS41745 Baykov Ilya Sergeevich: 21
