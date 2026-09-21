@@ -2,45 +2,45 @@
 Total IPs looked up: 5000
 
 ## Top countries
-- XX: 1792
-- US: 511
-- DE: 430
+- XX: 1829
+- US: 505
+- DE: 427
 - PE: 229
-- NL: 219
-- GB: 166
-- RU: 157
-- SC: 135
-- FR: 128
-- FI: 86
-- IR: 83
-- SG: 64
-- AE: 58
-- HK: 55
-- LT: 45
-- KR: 44
-- CA: 39
+- NL: 226
+- GB: 164
+- RU: 154
+- SC: 133
+- FR: 121
+- FI: 85
+- IR: 74
+- SG: 67
+- HK: 54
+- AE: 53
+- KR: 49
+- LT: 48
 - AT: 38
-- EE: 36
-- BR: 36
+- CA: 38
+- TW: 37
+- SE: 36
 
 ## Top ASNs
-- AS13335 Cloudflare, Inc.: 957
-- AS209242 Cloudflare London, LLC: 347
+- AS13335 Cloudflare, Inc.: 1012
+- AS209242 Cloudflare London, LLC: 342
 - AS24940 Hetzner Online GmbH: 241
 - AS273133 CONEX TV E.I.R.L.: 228
-- AS54113 Fastly, Inc.: 161
-- AS16509 Amazon.com, Inc.: 88
-- AS16276 OVH SAS: 87
+- AS54113 Fastly, Inc.: 164
+- AS16509 Amazon.com, Inc.: 104
 - AS3491 PCCW Global, Inc.: 87
-- AS14061 DigitalOcean, LLC: 81
-- AS210644 Aeza International Ltd: 48
-- AS209847 WorkTitans B.V.: 31
-- AS2856 British Telecommunications PLC: 31
-- AS56971 Cgi Global Limited: 29
-- AS396982 Google LLC: 29
-- AS63949 Akamai Connected Cloud: 27
-- AS31898 Oracle Corporation: 26
+- AS16276 OVH SAS: 86
+- AS14061 DigitalOcean, LLC: 70
+- AS210644 Aeza International Ltd: 47
+- AS209847 WorkTitans B.V.: 30
+- AS56971 Cgi Global Limited: 30
+- AS396982 Google LLC: 30
+- AS2856 British Telecommunications PLC: 28
+- AS31898 Oracle Corporation: 25
 - AS14197 HEALTH MARKET SCIENCE: 25
-- AS12876 Scaleway S.a.s.: 23
-- AS20473 The Constant Company, LLC: 22
-- AS45102 Alibaba US Technology Co., Ltd.: 21
+- AS63949 Akamai Connected Cloud: 24
+- AS12876 Scaleway S.a.s.: 22
+- AS20473 The Constant Company, LLC: 21
+- AS17561 LARUS Limited: 21
