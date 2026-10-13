@@ -141,7 +141,66 @@ class ConfigParser:
             return None
 
     @staticmethod
-    def parse(uri: str) -> Optional[VPNNode]:
+    def parse_trojan(uri: str) -> Optional[VPNNode]:
+        """Parse Trojan URI: trojan://password@host:port?params#remark"""
+        try:
+            if "#" in uri:
+                uri_part, remark = uri.rsplit("#", 1)
+                remark = unquote(remark.strip())
+            else:
+                uri_part, remark = uri, ""
+            match = re.match(r"trojan://([^@]+)@([^:]+):(\d+)(.*)", uri_part)
+            if not match:
+                return None
+            password, host, port, query_part = match.groups()
+            port = int(port)
+            params = {}
+            if query_part.startswith("?"):
+                raw = parse_qs(query_part[1:])
+                params = {k: v[0] if isinstance(v, list) else v for k, v in raw.items()}
+            return VPNNode(
+                protocol="trojan",
+                host=host,
+                port=port,
+                password=password,
+                remark=remark,
+                tls=params.get("security") == "tls" or "sni" in params,
+                sni=params.get("sni"),
+                extra=params,
+            )
+        except Exception:
+            return None
+
+    @staticmethod
+    def parse_hysteria2(uri: str) -> Optional[VPNNode]:
+        """Parse Hysteria2 URI: hysteria2://password@host:port?params#remark"""
+        try:
+            if "#" in uri:
+                uri_part, remark = uri.rsplit("#", 1)
+                remark = unquote(remark.strip())
+            else:
+                uri_part, remark = uri, ""
+            match = re.match(r"hysteria2://([^@]+)@([^:]+):(\d+)(.*)", uri_part)
+            if not match:
+                return None
+            password, host, port, query_part = match.groups()
+            port = int(port)
+            params = {}
+            if query_part.startswith("?"):
+                raw = parse_qs(query_part[1:])
+                params = {k: v[0] if isinstance(v, list) else v for k, v in raw.items()}
+            return VPNNode(
+                protocol="hysteria2",
+                host=host,
+                port=port,
+                password=password,
+                remark=remark,
+                sni=params.get("sni"),
+                extra=params,
+            )
+        except Exception:
+            return None
+
         """Auto-detect and parse any supported protocol"""
         uri = uri.strip()
         if uri.startswith("vless://"):
@@ -150,6 +209,10 @@ class ConfigParser:
             return ConfigParser.parse_vmess(uri)
         if uri.startswith("ss://"):
             return ConfigParser.parse_ss(uri)
+        if uri.startswith("trojan://"):
+            return ConfigParser.parse_trojan(uri)
+        if uri.startswith("hysteria2://") or uri.startswith("hy2://"):
+            return ConfigParser.parse_hysteria2(uri)
         return None
 
     def parse_text(self, text: str, source: str = "unknown") -> List[VPNNode]:
