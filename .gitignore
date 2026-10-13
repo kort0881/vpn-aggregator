@@ -203,5 +203,15 @@ cython_debug/
 
 # Marimo
 marimo/_static/
-marimo/_lsp/
+marimo/_sp/
 __marimo__/
+
+# Runtime artifacts
+out/*
+!out/.gitkeep
+data/logs/
+archive/
+*.backup
+*.mmdb
+sources_meta/*.md
+*.log
