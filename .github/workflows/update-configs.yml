@@ -5,6 +5,10 @@ on:
     - cron: '0 */6 * * *'   # каждые 6 часов
   workflow_dispatch:         # даёт кнопку "Run workflow" в Actions
 
+concurrency:
+  group: update-vpn-configs
+  cancel-in-progress: false
+
 jobs:
   update-configs:
     runs-on: ubuntu-latest
@@ -21,7 +25,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -32,20 +37,21 @@ jobs:
         run: |
           python pipeline.py
 
-      - name: Commit changes if any
+      - name: Commit & push changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add out/
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A -- out/ 2>/dev/null || true
+
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "Auto-update status"
 
-      - name: Push
-        run: |
-          git push origin HEAD:main
+          git commit -m "Auto-update status $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}" || true
+          git push origin HEAD:"${GITHUB_REF_NAME:-main}"
 
       - name: Generate summary
         if: always()
@@ -60,4 +66,3 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "out/status.txt not found" >> "$GITHUB_STEP_SUMMARY"
           fi
-
