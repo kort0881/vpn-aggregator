@@ -5,6 +5,10 @@ on:
     - cron: '0 3 * * *'   # раз в сутки по UTC
   workflow_dispatch:
 
+concurrency:
+  group: geoip-report
+  cancel-in-progress: false
+
 jobs:
   geoip-report:
     runs-on: ubuntu-latest
@@ -21,7 +25,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -32,17 +37,25 @@ jobs:
         run: |
           python geoip_pipeline.py
 
-      - name: Commit GeoIP report if any
+      - name: Debug — что реально создалось
+        if: always()
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add sources_meta/geoip_report.md
+          ls -la sources_meta/ 2>/dev/null || echo "sources_meta отсутствует"
+          find . -name 'geoip_report.md' -print
+
+      - name: Commit & push GeoIP report
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # -A подхватит и новые, и изменённые; || true — не падать если файла нет
+          git add -A -- sources_meta/geoip_report.md 2>/dev/null || true
+
           if git diff --cached --quiet; then
             echo "No GeoIP changes to commit"
             exit 0
           fi
-          git commit -m "Auto-update GeoIP report"
 
-      - name: Push
-        run: |
-          git push origin HEAD:main
+          git commit -m "Auto-update GeoIP report $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}" || true
+          git push origin HEAD:"${GITHUB_REF_NAME:-main}"
