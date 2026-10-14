@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 @dataclass
 class VPNNode:
     """Parsed VPN node"""
-    protocol: str  # vless, vmess, ss
+    protocol: str  # vless, vmess, ss, trojan, hysteria2
     host: str
     port: int
     uuid: Optional[str] = None
@@ -79,6 +79,8 @@ class ConfigParser:
                 return None
 
             b64_part = uri[8:]
+            # добить паддинг, если потерялся
+            b64_part += "=" * (-len(b64_part) % 4)
             json_str = base64.b64decode(b64_part).decode("utf-8")
             config = json.loads(json_str)
 
@@ -118,6 +120,7 @@ class ConfigParser:
 
             cred_part, addr_part = uri_part.split("@", 1)
             try:
+                cred_part += "=" * (-len(cred_part) % 4)
                 decoded = base64.b64decode(cred_part).decode("utf-8")
                 method, password = decoded.split(":", 1)
             except Exception:
@@ -149,15 +152,19 @@ class ConfigParser:
                 remark = unquote(remark.strip())
             else:
                 uri_part, remark = uri, ""
+
             match = re.match(r"trojan://([^@]+)@([^:]+):(\d+)(.*)", uri_part)
             if not match:
                 return None
+
             password, host, port, query_part = match.groups()
             port = int(port)
+
             params = {}
             if query_part.startswith("?"):
                 raw = parse_qs(query_part[1:])
                 params = {k: v[0] if isinstance(v, list) else v for k, v in raw.items()}
+
             return VPNNode(
                 protocol="trojan",
                 host=host,
@@ -180,15 +187,19 @@ class ConfigParser:
                 remark = unquote(remark.strip())
             else:
                 uri_part, remark = uri, ""
+
             match = re.match(r"hysteria2://([^@]+)@([^:]+):(\d+)(.*)", uri_part)
             if not match:
                 return None
+
             password, host, port, query_part = match.groups()
             port = int(port)
+
             params = {}
             if query_part.startswith("?"):
                 raw = parse_qs(query_part[1:])
                 params = {k: v[0] if isinstance(v, list) else v for k, v in raw.items()}
+
             return VPNNode(
                 protocol="hysteria2",
                 host=host,
@@ -201,8 +212,12 @@ class ConfigParser:
         except Exception:
             return None
 
+    @staticmethod
+    def parse(uri: str) -> Optional[VPNNode]:
         """Auto-detect and parse any supported protocol"""
         uri = uri.strip()
+        if not uri:
+            return None
         if uri.startswith("vless://"):
             return ConfigParser.parse_vless(uri)
         if uri.startswith("vmess://"):
@@ -276,5 +291,22 @@ class ConfigParser:
                 uri += f"#{remark}"
             return uri
 
-        return ""
+        if node.protocol == "trojan":
+            params = "&".join(f"{k}={v}" for k, v in node.extra.items())
+            uri = f"trojan://{node.password}@{node.host}:{node.port}"
+            if params:
+                uri += f"?{params}"
+            if remark:
+                uri += f"#{remark}"
+            return uri
 
+        if node.protocol == "hysteria2":
+            params = "&".join(f"{k}={v}" for k, v in node.extra.items())
+            uri = f"hysteria2://{node.password}@{node.host}:{node.port}"
+            if params:
+                uri += f"?{params}"
+            if remark:
+                uri += f"#{remark}"
+            return uri
+
+        return ""
