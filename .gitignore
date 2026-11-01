@@ -214,4 +214,5 @@ archive/
 *.backup
 *.mmdb
 sources_meta/*.md
+!sources_meta/geoip_report.md
 *.log
