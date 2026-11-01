@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 """
-GeoIP pipeline под CI:
+GeoIP pipeline под CI.
 
-- читает итоговые ноды из out/by_type/*.txt (vless/vmess/ss),
-- вытаскивает IP (если есть) или host,
+- читает ноды из out/by_type/*.txt (vless / vmess / ss),
+- извлекает host (или IP) с учётом base64-форматов VMess и SS,
+- резолвит host → IP (если это домен),
 - по GeoLite2-Country.mmdb и GeoLite2-ASN.mmdb определяет country / ASN,
-- пишет агрегированную статистику по странам и ASN в sources_meta/geoip_report.md.
+- пишет отчёт в sources_meta/geoip_report.md.
 
-Работает только по части нод (лимит), чтобы не грузить CI.
+Отчёт пишется ВСЕГДА — даже если нет нод или нет MMDB.
+Это гарантирует, что `git add sources_meta/geoip_report.md` в CI
+не упадёт с `pathspec ... did not match any files`.
 """
 
 from __future__ import annotations
 
-import os
-from collections import Counter, defaultdict
+import base64
+import ipaddress
+import json
+import socket
+from collections import Counter
+from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Tuple, Optional, List
+from typing import List, Optional, Tuple
+from urllib.parse import urlparse
 
 import geoip2.database
 
@@ -29,10 +37,112 @@ BY_TYPE_FILES = [
     OUT_DIR / "by_type" / "ss.txt",
 ]
 
-MAX_NODES = 5000  # лимит нод, по которым делаем GeoIP в CI
+MAX_NODES = 5000
+REPORT_NAME = "geoip_report.md"
 
 
-def load_geoip_readers() -> Tuple[Optional[geoip2.database.Reader], Optional[geoip2.database.Reader]]:
+# ----------------------- Извлечение хоста из ноды -----------------------
+
+def _split_host_port(hostport: str) -> Optional[str]:
+    """'[2001:db8::1]:443' -> '2001:db8::1'; 'example.com:443' -> 'example.com'."""
+    hostport = hostport.strip()
+    if not hostport:
+        return None
+    if hostport.startswith("["):
+        end = hostport.find("]")
+        if end != -1:
+            return hostport[1:end]
+    if ":" in hostport:
+        return hostport.rsplit(":", 1)[0]
+    return hostport
+
+
+def _b64decode_safe(s: str) -> str:
+    s = s.strip()
+    s += "=" * (-len(s) % 4)
+    return base64.b64decode(s).decode("utf-8", "ignore")
+
+
+def _extract_vmess(line: str) -> Optional[str]:
+    try:
+        obj = json.loads(_b64decode_safe(line[len("vmess://"):]))
+        return obj.get("add") or None
+    except Exception:
+        return None
+
+
+def _extract_ss(line: str) -> Optional[str]:
+    try:
+        body = line[len("ss://"):].split("#", 1)[0].split("?", 1)[0]
+        if "@" in body:
+            return _split_host_port(body.rsplit("@", 1)[1])
+        decoded = _b64decode_safe(body)
+        if "@" in decoded:
+            return _split_host_port(decoded.rsplit("@", 1)[1])
+    except Exception:
+        return None
+    return None
+
+
+def _extract_uri_host(line: str) -> Optional[str]:
+    try:
+        return urlparse(line).hostname
+    except Exception:
+        return None
+
+
+def extract_host_from_line(line: str) -> Optional[str]:
+    line = line.strip()
+    if not line:
+        return None
+    if line.startswith("vmess://"):
+        return _extract_vmess(line)
+    if line.startswith("ss://"):
+        return _extract_ss(line)
+    if "://" in line:
+        return _extract_uri_host(line)
+    return None
+
+
+# ----------------------- Резолв хоста в IP -----------------------
+
+@lru_cache(maxsize=8192)
+def resolve_ip(host: str) -> Optional[str]:
+    if not host:
+        return None
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    try:
+        return socket.gethostbyname(host)
+    except Exception:
+        return None
+
+
+# ----------------------- Сбор хостов -----------------------
+
+def collect_hosts() -> List[str]:
+    hosts: List[str] = []
+    for path in BY_TYPE_FILES:
+        if not path.exists():
+            print(f"    skip missing: {path}", flush=True)
+            continue
+        print(f"    reading {path}", flush=True)
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            h = extract_host_from_line(line)
+            if h:
+                hosts.append(h)
+                if len(hosts) >= MAX_NODES:
+                    print(f"    hit MAX_NODES={MAX_NODES}, stopping", flush=True)
+                    return hosts
+    return hosts
+
+
+# ----------------------- GeoIP readers -----------------------
+
+def load_geoip_readers():
     country_path = DATA_DIR / "GeoLite2-Country.mmdb"
     asn_path = DATA_DIR / "GeoLite2-ASN.mmdb"
 
@@ -40,111 +150,110 @@ def load_geoip_readers() -> Tuple[Optional[geoip2.database.Reader], Optional[geo
     geo_asn = None
 
     if country_path.exists():
-        geo_country = geoip2.database.Reader(str(country_path))
+        try:
+            geo_country = geoip2.database.Reader(str(country_path))
+            print(f"    loaded {country_path}", flush=True)
+        except Exception as e:
+            print(f"!!! failed to open {country_path}: {e}", flush=True)
     else:
-        print(f"!!! GeoLite2-Country.mmdb not found at {country_path}")
+        print(f"!!! {country_path} not found", flush=True)
 
     if asn_path.exists():
-        geo_asn = geoip2.database.Reader(str(asn_path))
+        try:
+            geo_asn = geoip2.database.Reader(str(asn_path))
+            print(f"    loaded {asn_path}", flush=True)
+        except Exception as e:
+            print(f"!!! failed to open {asn_path}: {e}", flush=True)
     else:
-        print(f"!!! GeoLite2-ASN.mmdb not found at {asn_path}")
+        print(f"!!! {asn_path} not found", flush=True)
 
     return geo_country, geo_asn
 
 
-def extract_ip_from_line(line: str) -> Optional[str]:
-    """
-    Очень грубый разбор:
-    ищем 'ip=' или 'host=' в remark/URI.
-    Настрой под свой формат, если нужно точнее.
-    """
-    line = line.strip()
-    if not line or "://" not in line:
-        return None
+# ----------------------- Отчёт -----------------------
 
-    # пример: vless://user@host:port?param=...
-    try:
-        main_part = line.split("://", 1)[1]
-        host_port = main_part.split("?", 1)[0]
-        host = host_port.split("@")[-1].split(":")[0]
-        if host and any(c.isdigit() for c in host):
-            # ip-v4/v6 или домен, GeoIP сам умеет принимать host
-            return host
-    except Exception:
-        return None
+def write_report(
+    total_hosts: int,
+    resolved_ips: List[str],
+    countries: Counter,
+    asns: Counter,
+    note: str = "",
+) -> Path:
+    report_path = META_DIR / REPORT_NAME
+    lines: List[str] = ["# GeoIP report\n"]
+    if note:
+        lines.append(f"\n> ⚠️ {note}\n")
+    lines.append(f"\n- Hosts collected: **{total_hosts}**\n")
+    lines.append(f"- Resolved to IP: **{len(resolved_ips)}**\n")
+    lines.append(f"- GeoIP lookups: **{sum(countries.values())}**\n")
 
-    return None
+    lines.append("\n## Top countries\n")
+    if countries:
+        for country, cnt in countries.most_common(20):
+            lines.append(f"- {country}: {cnt}\n")
+    else:
+        lines.append("_no data_\n")
+
+    lines.append("\n## Top ASNs\n")
+    if asns:
+        for (asn, org), cnt in asns.most_common(20):
+            org = org or "(unknown)"
+            lines.append(f"- AS{asn} {org}: {cnt}\n")
+    else:
+        lines.append("_no data_\n")
+
+    lines.append("\n---\n_Generated by `geoip_pipeline.py`_\n")
+    report_path.write_text("".join(lines), encoding="utf-8")
+    print(f"    → report saved to {report_path}", flush=True)
+    return report_path
 
 
-def collect_ips() -> List[str]:
-    ips: List[str] = []
-    for path in BY_TYPE_FILES:
-        if not path.exists():
-            continue
-        print(f"    reading {path}")
-        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            ip = extract_ip_from_line(line)
-            if ip:
-                ips.append(ip)
-                if len(ips) >= MAX_NODES:
-                    return ips
-    return ips
-
+# ----------------------- Основной пайплайн -----------------------
 
 def run_geoip() -> None:
     print(">>> geoip_pipeline.py started", flush=True)
     META_DIR.mkdir(parents=True, exist_ok=True)
 
-    ips = collect_ips()
-    print(f"    collected IP/hosts for lookup: {len(ips)}", flush=True)
+    hosts = collect_hosts()
+    print(f"    collected hosts: {len(hosts)}", flush=True)
 
-    if not ips:
-        print("    no IPs found, nothing to do", flush=True)
+    if not hosts:
+        write_report(0, [], Counter(), Counter(), "no hosts parsed from out/by_type/*.txt")
         return
 
     geo_country, geo_asn = load_geoip_readers()
     if not geo_country and not geo_asn:
-        print("    no GeoIP databases available, abort", flush=True)
+        write_report(len(hosts), [], Counter(), Counter(), "GeoLite2 databases not available")
         return
 
+    resolved: List[str] = []
     country_counter: Counter[str] = Counter()
     asn_counter: Counter[Tuple[int, str]] = Counter()
+    unresolved = 0
 
-    for ip in ips:
-        country = "XX"
+    for host in hosts:
+        ip = resolve_ip(host)
+        if not ip:
+            unresolved += 1
+            continue
+        resolved.append(ip)
+
         if geo_country:
             try:
-                c = geo_country.country(ip)
-                country = c.country.iso_code or "XX"
+                iso = geo_country.country(ip).country.iso_code or "XX"
             except Exception:
-                country = "XX"
-
-        country_counter[country] += 1
+                iso = "XX"
+            country_counter[iso] += 1
 
         if geo_asn:
             try:
                 a = geo_asn.asn(ip)
-                asn = a.autonomous_system_number
-                org = a.autonomous_system_organization or ""
-                asn_counter[(asn, org)] += 1
+                asn_counter[(a.autonomous_system_number, a.autonomous_system_organization or "")] += 1
             except Exception:
                 pass
 
-    report_path = META_DIR / "geoip_report.md"
-    lines = []
-    lines.append("# GeoIP report\n")
-    lines.append(f"Total IPs looked up: {len(ips)}\n")
-
-    lines.append("\n## Top countries\n")
-    for country, cnt in country_counter.most_common(20):
-        lines.append(f"- {country}: {cnt}\n")
-
-    lines.append("\n## Top ASNs\n")
-    for (asn, org), cnt in asn_counter.most_common(20):
-        lines.append(f"- AS{asn} {org}: {cnt}\n")
-
-    report_path.write_text("".join(lines), encoding="utf-8")
-    print(f"    → report saved to {report_path}", flush=True)
+    note = f"{unresolved} host(s) could not be resolved to IP" if unresolved else ""
+    write_report(len(hosts), resolved, country_counter, asn_counter, note)
     print(">>> geoip_pipeline.py finished", flush=True)
 
 
