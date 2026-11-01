@@ -215,4 +215,5 @@ archive/
 *.mmdb
 sources_meta/*.md
 !sources_meta/geoip_report.md
+!sources_meta/pipeline_report.md
 *.log
