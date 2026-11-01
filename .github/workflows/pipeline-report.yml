@@ -5,8 +5,6 @@ on:
     - cron: '0 2 * * 0'  # раз в неделю, воскресенье 02:00 UTC
   workflow_dispatch:
 
-# Предотвращает одновременный запуск двух отчётов.
-# Второй запуск встанет в очередь, а не полезет параллельно.
 concurrency:
   group: pipeline-report
   cancel-in-progress: false
@@ -64,8 +62,41 @@ jobs:
           cat sources_meta/geoip_report.md || true
 
       - name: Commit and push reports
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto-update pipeline & GeoIP reports [skip ci]"
-          file_pattern: "sources_meta/pipeline_report.md sources_meta/geoip_report.md"
-          branch: main
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 1. Сохраняем сгенерированные отчёты, чтобы reset их не снёс
+          tmp="$(mktemp -d)"
+          cp sources_meta/pipeline_report.md "$tmp/pipeline_report.md"
+          cp sources_meta/geoip_report.md    "$tmp/geoip_report.md"
+
+          # 2. Приводим локальную ветку к актуальному состоянию remote.
+          #    Это защищает от force-push'ей и гонок с другими воркфлоу.
+          git fetch origin main
+          git reset --hard origin/main
+
+          # 3. Возвращаем отчёты и коммитим, если есть изменения
+          cp "$tmp/pipeline_report.md" sources_meta/pipeline_report.md
+          cp "$tmp/geoip_report.md"    sources_meta/geoip_report.md
+
+          git add sources_meta/pipeline_report.md sources_meta/geoip_report.md
+          if git diff --cached --quiet; then
+            echo "No report changes to commit"
+            exit 0
+          fi
+          git commit -m "Auto-update pipeline & GeoIP reports [skip ci]"
+
+          # 4. Пуш с повтором: если между fetch и push кто-то успел запушить,
+          #    ребейзим наш единственный коммит поверх и пробуем снова.
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "Pushed on attempt $i"
+              exit 0
+            fi
+            echo "Push rejected (attempt $i), pulling --rebase and retrying"
+            git pull --rebase origin main
+          done
+          echo "::error::Failed to push after 3 attempts"
+          exit 1
