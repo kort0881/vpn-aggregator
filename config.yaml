@@ -7,9 +7,9 @@ app:
 
 filters:
   geo:
-    eu_only: true
-    exclude_countries: ["RU", "BY", "KZ", "CN", "IR"]
-    whitelist_countries: null
+    eu_only: false
+    exclude_countries: ["CN", "IR"]
+    whitelist_countries: ["RU", "BY", "KZ", "DE", "NL", "FI", "GB", "FR"]
   performance:
     min_alive_ratio: 0.6
     min_ping_ms: null
